@@ -41,8 +41,8 @@ export const users = pgTable("users", {
   email: text("email").notNull(),
   emailVerified: boolean("email_verified").notNull().default(false),
   name: text("name").notNull(), // Better Auth 必需字段
+  image: text("image"), // 头像 URL(Better Auth 标准字段)
   nickname: text("nickname"),
-  avatarUrl: text("avatar_url"),
   /** male / female */
   gender: text("gender"),
   age: integer("age"),
@@ -213,6 +213,57 @@ export const dayMarks = pgTable("day_marks", {
 ]);
 
 /* ============================================================
+ * Better Auth 认证表(account/session/verification)
+ * 依据 better-auth@1.7 pg 标准 schema;密码哈希存 accounts.password
+ * ============================================================ */
+
+/** 凭证账户(邮箱密码等;每用户可多 provider 多行) */
+export const accounts = pgTable("accounts", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  accountId: text("account_id").notNull(),
+  providerId: text("provider_id").notNull(),
+  accessToken: text("access_token"),
+  refreshToken: text("refresh_token"),
+  idToken: text("id_token"),
+  accessTokenExpiresAt: timestamp("access_token_expires_at", { withTimezone: true }),
+  refreshTokenExpiresAt: timestamp("refresh_token_expires_at", { withTimezone: true }),
+  scope: text("scope"),
+  /** Better Auth 管理的密码哈希(scrypt),业务代码禁止读取 */
+  password: text("password"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index("accounts_user_idx").on(t.userId),
+]);
+
+/** 会话(HttpOnly Cookie 对应的服务端记录) */
+export const sessions = pgTable("sessions", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  token: text("token").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index("sessions_user_idx").on(t.userId),
+]);
+
+/** 验证记录(emailOTP 验证码落库于此,自过期) */
+export const verifications = pgTable("verifications", {
+  id: text("id").primaryKey(),
+  identifier: text("identifier").notNull(),
+  value: text("value").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index("verifications_identifier_idx").on(t.identifier),
+]);
+
+/* ============================================================
  * 饮食 / 补剂 / 饮水 / 体重(10~15)
  * ============================================================ */
 
@@ -323,6 +374,9 @@ export const events = pgTable("events", {
 
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
+export type Account = typeof accounts.$inferSelect;
+export type Session = typeof sessions.$inferSelect;
+export type Verification = typeof verifications.$inferSelect;
 export type NutritionGoal = typeof nutritionGoals.$inferSelect;
 export type TrainingCycle = typeof trainingCycles.$inferSelect;
 export type TrainingDay = typeof trainingDays.$inferSelect;

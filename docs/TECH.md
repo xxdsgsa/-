@@ -2,10 +2,10 @@
 
 | 项目 | 内容 |
 | --- | --- |
-| 文档版本 | v1.0.1（定稿·冻结） |
+| 文档版本 | v1.0.2(定稿·冻结) |
 | 对应 PRD | v1.6（docs/PRD.md） |
 | 当前阶段 | **定稿·冻结**——〇.2 四项决策全部确认；后续重大变更遵循 0.1-5（先改 ADR 再改代码） |
-| 最近更新 | 2026-09-12 |
+| 最近更新 | 2026-09-14 |
 
 ### 更新记录
 
@@ -16,6 +16,7 @@
 | v0.3 | 2026-09-12 | 评审修订 | 确认 2 项决策:部署策略(开发 Vercel 快速验证,生产按国内访问需求及 Next.js 兼容性测试结果选 EdgeOne)、数据访问(薄服务层,业务逻辑禁止写入页面/API 层);同步 ADR-5/9、4.2 分层红线、附录 C 项目规则 |
 | v1.0 | 2026-09-12 | 定稿·冻结 | 确认剩余 2 项:平台形态(移动端优先响应式 Web App,V2 用 Capacitor 打包上架)、邮件服务(Resend);〇.2 四项决策全部冻结,进入脚手架阶段 |
 | v1.0.1 | 2026-09-12 | 修订 | 复查修复 4+1 项:流程 2 补"0 组完成→未完成"与"今日进行中→未开始"分支(3.1.9/3.2.7);4.1 架构图部署环境与 ADR-9 对齐;nutrition_goals 补 weight_at_calc 基线列;3.1 补"仅当日"服务端 UTC+8 宽松校验约定;ADR-6 注明登录限流由 Better Auth rateLimit 实现 |
+| v1.0.2 | 2026-09-14 | 修订 | 认证层落地同步:users.avatar_url 更名 image(Better Auth 标准字段);新增 Better Auth 自管三表 accounts/sessions/verifications(2.2 用户组注明) |
 
 > 定位:PRD 回答"做什么",本文档回答"怎么做"。包含五大部分:技术决策记录、数据模型、API 设计、架构与流程、第三方集成。**变更即更新**——需求或方案变化时同步修订本文档并升版。
 
@@ -103,7 +104,7 @@ erDiagram
 
 | 表 | 字段要点 | 约束/索引 |
 | --- | --- | --- |
-| users | id(uuid)、email、password_hash(Better Auth 管理)、nickname、avatar_url、gender、age、height_cm、body_fat_pct、goal_type、target_weight_kg、target_date、weekly_training_days、onboarded_at、deletion_requested_at、created_at | email 唯一;deletion_requested_at 非空即处于 15 天冷静期 |
+| users | id(uuid)、email、password_hash(Better Auth 管理,存 accounts 表)、nickname、image(头像 URL,Better Auth 标准字段)、gender、age、height_cm、body_fat_pct、goal_type、target_weight_kg、target_date、weekly_training_days、onboarded_at、deletion_requested_at、created_at | email 唯一;deletion_requested_at 非空即处于 15 天冷静期;另有 Better Auth 自管三表 accounts/sessions/verifications(v1.0.2 认证层落地) |
 | nutrition_goals | user_id(PK/FK)、calories_kcal、protein_g、carbs_g、fat_g、water_ml、manual_calories/manual_protein/manual_carbs/manual_fat/manual_water(5 个布尔)、weight_at_calc(上次计算时体重)、recalculated_at | 手动项标记(3.4.3 不覆盖规则);weight_at_calc 为"体重变化 2kg 触发"的比较基线(每次计算时写入) |
 | verification_codes | id、email、code_hash、purpose(register/reset/delete)、expires_at、attempts、created_at | 邮箱验证码由 Better Auth emailOTP 管理,此表仅兜底记录;查询 (email, created_at) 计数限频(3.6.3:60s 冷却、日 5 次) |
 
