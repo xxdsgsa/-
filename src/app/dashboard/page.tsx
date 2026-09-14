@@ -13,6 +13,7 @@ export default async function DashboardPage() {
     .getSession({ headers: await headers() })
     .catch(() => null);
   if (!session) redirect("/login");
+  if (!session.user.onboardedAt) redirect("/onboarding"); // 仅首次展示(3.6.9)
 
   const nickname = session.user.name || "FitMate 用户";
 

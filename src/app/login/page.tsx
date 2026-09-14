@@ -29,7 +29,7 @@ export default function LoginPage() {
 
     setSubmitting(true);
     try {
-      const { error } = await authClient.signIn.email({ email, password });
+      const { data, error } = await authClient.signIn.email({ email, password });
       if (error) {
         if (error.status === 429) {
           toast.error("尝试次数过多,账号已临时锁定,请 15 分钟后重试");
@@ -40,7 +40,8 @@ export default function LoginPage() {
         return;
       }
       toast.success("登录成功");
-      router.push("/dashboard"); // TODO(onboarding): 未完成首次设置则引导
+      // 未完成首次设置 → 引导完成(PRD 3.6.6)
+      router.push(data?.user?.onboardedAt ? "/dashboard" : "/onboarding");
     } catch {
       toast.error("网络异常,请稍后再试");
     } finally {

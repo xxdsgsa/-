@@ -27,6 +27,12 @@ export const auth = betterAuth({
     enabled: true,
     autoSignIn: true, // 注册成功即登录(PRD 3.6.2)
   },
+  user: {
+    additionalFields: {
+      // 首次设置完成时间;null = 未完成 onboarding(登录后跳转依据,PRD 3.6.6)
+      onboardedAt: { type: "date", returned: true },
+    },
+  },
   plugins: [
     emailOTP({
       otpLength: 6, // 6 位数字验证码(3.6.2)

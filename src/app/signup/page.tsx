@@ -118,7 +118,7 @@ export default function SignupPage() {
       }
 
       toast.success("注册成功");
-      router.push("/dashboard"); // TODO(onboarding): 首次设置完成后引导
+      router.push("/onboarding"); // 首次必未完成设置
     } catch {
       toast.error("网络异常,请稍后再试");
     } finally {
