@@ -31,6 +31,8 @@ export const auth = betterAuth({
     emailOTP({
       otpLength: 6, // 6 位数字验证码(3.6.2)
       expiresIn: 300, // 5 分钟有效
+      // 发码限频:每日 5 次(PRD 3.6.3);60 秒冷却由前端按钮倒计时实现
+      rateLimit: { window: 86400, max: 5 },
       async sendVerificationOTP({ email, otp, type }) {
         // 开发期:console 输出(ADR-16 日志分轨);接入 Resend 后在此发送邮件
         // TODO(resend): RESEND_API_KEY 配置后切换为真实发送,当前仅 dev 模式
