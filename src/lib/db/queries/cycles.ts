@@ -6,6 +6,8 @@
  */
 import { desc, eq, and, isNull } from "drizzle-orm";
 
+import { serverToday } from "@/lib/date";
+
 import { db } from "@/db";
 import { trainingCycles } from "@/db/schema";
 
@@ -16,11 +18,6 @@ export interface CreateCycleInput {
   endDate: string;
   /** 客户端"今日"(设备时区日历日,ADR-12);缺省按服务端 UTC+8 */
   today?: string;
-}
-
-/** 服务端"今日"(UTC+8 宽松口径,TECH 3.1) */
-function serverToday(): string {
-  return new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(0, 10);
 }
 
 export async function createCycle(input: CreateCycleInput) {
