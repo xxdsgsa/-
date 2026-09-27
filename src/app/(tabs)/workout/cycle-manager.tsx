@@ -1,14 +1,16 @@
 "use client";
 
 /**
- * 训练周期管理(PRD 3.1.2~3.1.4)
+ * 训练周期管理 + 周列表(PRD 3.1.2~3.1.4)
  *
  * - 顶栏:周期切换(Sheet 列表)+ 新建(+)
  * - 周期卡:编辑 / 激活(未开始)/ 删除(软删,历史保留 3.1.11)
+ * - 周列表:自然周切换(‹ Week N ›),每天四态标识(3.1.9:○✅❌💤),今天高亮;
+ *   点击某天 → 日编辑页 /workout/day(3.1.5)
+ * - 周期/周选择由 URL 查询参数驱动(RSC 直出),切换即 router.push
  * - 创建/激活遇已有进行中周期 → 409,确认"结束并激活新周期?"后带 force 重发(3.1.4)
- * - 周计划/动作库为后续迭代(WORKOUT-002+),此处仅占位说明
  */
-import { ChevronDown, Pencil, Play, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Pencil, Play, Plus, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -24,6 +26,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { cycleWeeks, formatDateRange } from "@/lib/cycles";
+import type { CycleWeekView } from "@/lib/db/queries/training-days";
 
 export interface CycleView {
   id: string;
@@ -49,9 +52,65 @@ function StatusBadge({ status }: { status: string }) {
   return <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${cls}`}>{status}</span>;
 }
 
-export function CycleManager({ cycles }: { cycles: CycleView[] }) {
+/** 周列表单日(3.1.9 四态:○ 未开始 / ✅ 已完成 / ❌ 未完成 / 💤 休息日) */
+function DayRow({
+  day,
+  cycleId,
+}: {
+  day: CycleWeekView["days"][number];
+  cycleId: string;
+}) {
   const router = useRouter();
-  const [selectedId, setSelectedId] = useState<string | null>(cycles[0]?.id ?? null);
+  const content =
+    day.state === "rest"
+      ? "休息"
+      : day.trainingNames.length > 0
+        ? day.trainingNames.join("+")
+        : day.state === "missed"
+          ? "未训练"
+          : "暂无";
+  const emoji =
+    day.state === "completed" ? "✅" : day.state === "missed" ? "❌" : day.state === "rest" ? "💤" : day.state === "planned" ? "○" : "";
+
+  return (
+    <button
+      type="button"
+      onClick={() => router.push(`/workout/day?cycle=${cycleId}&date=${day.date}`)}
+      className={`flex w-full items-center justify-between px-4 py-2.5 text-left ${
+        day.isToday ? "bg-primary/5" : ""
+      }`}
+    >
+      <span className="flex items-center gap-3">
+        <span className={`w-9 text-sm ${day.isToday ? "font-bold text-primary" : day.isPast ? "text-muted-foreground" : ""}`}>
+          {day.weekday}
+        </span>
+        <span className="text-xs text-muted-foreground">{day.dayLabel}</span>
+        {day.isToday && <span className="rounded-full bg-primary px-1.5 py-0.5 text-[10px] text-primary-foreground">今天</span>}
+      </span>
+      <span className="flex min-w-0 flex-1 items-center justify-end gap-2">
+        <span
+          className={`truncate text-sm ${
+            day.state === "empty" ? "text-muted-foreground/60" : day.isPast ? "text-muted-foreground" : ""
+          }`}
+        >
+          {content}
+        </span>
+        {emoji && <span className="w-5 shrink-0 text-center text-sm">{emoji}</span>}
+      </span>
+    </button>
+  );
+}
+
+export function CycleManager({
+  cycles,
+  selectedId,
+  week,
+}: {
+  cycles: CycleView[];
+  selectedId: string | null;
+  week: CycleWeekView | null;
+}) {
+  const router = useRouter();
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<CycleView | null>(null); // null = 新建
@@ -60,7 +119,7 @@ export function CycleManager({ cycles }: { cycles: CycleView[] }) {
   const [endDate, setEndDate] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  const selected = cycles.find((c) => c.id === selectedId) ?? cycles[0] ?? null;
+  const selected = cycles.find((c) => c.id === selectedId) ?? null;
   const formValid = name.trim() !== "" && startDate !== "" && endDate !== "" && endDate > startDate;
 
   function openCreate() {
@@ -91,6 +150,7 @@ export function CycleManager({ cycles }: { cycles: CycleView[] }) {
       });
       const body = (await res.json().catch(() => null)) as {
         success: boolean;
+        data?: { cycle?: { id: string } };
         error?: { code: string; message: string };
       } | null;
 
@@ -103,10 +163,14 @@ export function CycleManager({ cycles }: { cycles: CycleView[] }) {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ name: name.trim(), startDate, endDate, today: todayStr(), force: true }),
           });
+          const retryBody = (await retry.json().catch(() => null)) as {
+            data?: { cycle?: { id: string } };
+          } | null;
           if (retry.ok) {
             toast.success("训练周期创建成功");
             setFormOpen(false);
-            router.refresh();
+            // 自动进入新周期(3.1.4 创建成功即切换查看)
+            router.push(`/workout?cycle=${retryBody?.data?.cycle?.id ?? ""}`);
           } else {
             toast.error("创建失败,请重试");
           }
@@ -120,7 +184,11 @@ export function CycleManager({ cycles }: { cycles: CycleView[] }) {
       }
       toast.success(isCreate ? "训练周期创建成功" : "周期已更新");
       setFormOpen(false);
-      router.refresh();
+      if (isCreate && body.data?.cycle?.id) {
+        router.push(`/workout?cycle=${body.data.cycle.id}`);
+      } else {
+        router.refresh();
+      }
     } catch {
       toast.error("网络异常,请检查网络后重试");
     } finally {
@@ -151,7 +219,7 @@ export function CycleManager({ cycles }: { cycles: CycleView[] }) {
         return;
       }
       toast.success("周期已激活");
-      router.refresh();
+      router.push(`/workout?cycle=${cycle.id}`);
     };
     try {
       await activate(false);
@@ -170,7 +238,11 @@ export function CycleManager({ cycles }: { cycles: CycleView[] }) {
         return;
       }
       toast.success("周期已删除");
-      router.refresh();
+      if (cycle.id === selectedId) {
+        router.push("/workout"); // 删除的是当前查看的周期,回到默认选择
+      } else {
+        router.refresh();
+      }
     } catch {
       toast.error("网络异常,请检查网络后重试");
     }
@@ -241,8 +313,44 @@ export function CycleManager({ cycles }: { cycles: CycleView[] }) {
               </div>
             </div>
 
-            <p className="pt-2 text-center text-xs text-muted-foreground">
-              周计划与动作库建设中(WORKOUT-002+)
+            {/* 周列表(3.1.2):自然周切换 + 每天四态(3.1.9) */}
+            {week && (
+              <div className="overflow-hidden rounded-lg border bg-card">
+                <div className="flex items-center justify-between border-b px-2 py-1.5">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={week.weekIndex <= 1}
+                    aria-label="上一周"
+                    onClick={() =>
+                      router.push(`/workout?cycle=${selected.id}&week=${week.weekIndex - 1}`)
+                    }
+                  >
+                    <ChevronLeft className="size-4" />
+                  </Button>
+                  <span className="text-sm font-semibold">Week {week.weekIndex}</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={week.weekIndex >= week.totalWeeks}
+                    aria-label="下一周"
+                    onClick={() =>
+                      router.push(`/workout?cycle=${selected.id}&week=${week.weekIndex + 1}`)
+                    }
+                  >
+                    <ChevronRight className="size-4" />
+                  </Button>
+                </div>
+                <div className="divide-y">
+                  {week.days.map((day) => (
+                    <DayRow key={day.date} day={day} cycleId={selected.id} />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <p className="pt-1 text-center text-xs text-muted-foreground">
+              点击某天编辑训练安排;动作库与训练执行在后续迭代(WORKOUT-003+)
             </p>
           </div>
         )
@@ -261,11 +369,11 @@ export function CycleManager({ cycles }: { cycles: CycleView[] }) {
                 key={cycle.id}
                 type="button"
                 onClick={() => {
-                  setSelectedId(cycle.id);
+                  router.push(`/workout?cycle=${cycle.id}`);
                   setSwitcherOpen(false);
                 }}
                 className={`flex w-full items-center justify-between rounded-lg border px-4 py-3 text-left ${
-                  cycle.id === selected.id ? "border-primary" : ""
+                  cycle.id === selectedId ? "border-primary" : ""
                 }`}
               >
                 <span>
