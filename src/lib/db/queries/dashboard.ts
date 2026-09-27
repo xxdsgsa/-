@@ -24,7 +24,7 @@ import {
   trainingSessions,
   waterLogs,
 } from "@/db/schema";
-import { getActiveCycle } from "./cycles";
+import { getActiveCycle, refreshCycleStatuses } from "./cycles";
 import { getNutritionGoals } from "./onboarding";
 
 /** 训练卡六态(3.7.3;周期内当天无计划归入 no_plan,3.2.4 空状态) */
@@ -82,6 +82,8 @@ export async function getDashboardData(
   userId: string,
   today: string,
 ): Promise<DashboardData> {
+  // 生命周期自动流转先行(3.1.4):过期进行中结束、到点未开始激活,训练卡才能正确呈现"无启用周期"
+  await refreshCycleStatuses(userId);
   const [training, nutrition, water, supplements, weight] = await Promise.all([
     getTrainingCard(userId, today),
     getNutritionCard(userId, today),

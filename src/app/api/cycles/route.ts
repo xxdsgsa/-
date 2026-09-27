@@ -1,8 +1,8 @@
 /**
- * POST /api/cycles —— 创建训练周期(PRD 3.1.4;onboarding 第 4 步简版)
+ * POST /api/cycles —— 创建训练周期(PRD 3.1.4)
  *
- * 校验:endDate > startDate;"仅一个进行中"由部分唯一索引兜底
- * (onboarding 场景新用户无旧周期,不会触发;训练模块完整 CRUD 后续扩展)。
+ * 校验:endDate > startDate;startDate ≤ 今日时新周期即为"进行中",
+ * 若已有进行中周期 → 409 返回其名称,前端弹"结束并激活新周期?"确认后带 force 重发。
  */
 import { headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
@@ -18,6 +18,7 @@ const bodySchema = z.object({
   startDate: z.string().regex(DATE_RE),
   endDate: z.string().regex(DATE_RE),
   today: z.string().regex(DATE_RE).optional(),
+  force: z.boolean().optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -39,7 +40,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { name, startDate, endDate, today } = parsed.data;
+  const { name, startDate, endDate, today, force } = parsed.data;
   if (endDate <= startDate) {
     return NextResponse.json(
       { success: false, error: { code: "VALIDATION_ERROR", message: "结束日期必须晚于开始日期" } },
@@ -47,13 +48,27 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const cycle = await createCycle({
+  const result = await createCycle({
     userId: session.user.id,
     name,
     startDate,
     endDate,
     today,
+    force,
   });
+  if (!result.ok) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: {
+          code: "ACTIVE_CYCLE_CONFLICT",
+          message: `当前周期『${result.activeCycle.name}』仍在进行中,是否结束并激活新周期?`,
+          activeCycle: { id: result.activeCycle.id, name: result.activeCycle.name },
+        },
+      },
+      { status: 409 },
+    );
+  }
 
-  return NextResponse.json({ success: true, data: { cycle } }, { status: 201 });
+  return NextResponse.json({ success: true, data: { cycle: result.cycle } }, { status: 201 });
 }
