@@ -1,0 +1,73 @@
+/**
+ * POST /api/trainings/:id/items —— 追加动作项(PRD 3.1.7 / TECH 3.3)
+ *
+ * 参数:组数*(≥1) / 次数*(≥1) / 目标重量(可选,≥0) / 休息时间(可选,默认90秒) / 备注(可选)。
+ * 同一动作可重复添加(3.2.9);追加序即动作顺序①②③。
+ */
+import { headers } from "next/headers";
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+
+import { auth } from "@/lib/auth";
+import { dayError } from "@/lib/api-days";
+import { addTrainingItem } from "@/lib/db/queries/training-items";
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const WEIGHT_RE = /^\d{1,4}(\.\d)?$/;
+
+const itemBodySchema = z.object({
+  exerciseId: z.string().uuid(),
+  sets: z.number().int().min(1).max(99),
+  reps: z.number().int().min(1).max(999),
+  targetWeight: z.string().regex(WEIGHT_RE).nullable().optional(),
+  restSeconds: z.number().int().min(0).max(3600).optional(),
+  note: z.string().trim().max(200).nullable().optional(),
+  today: z.string().regex(DATE_RE).optional(),
+});
+
+type Ctx = { params: Promise<{ id: string }> };
+
+export async function POST(req: NextRequest, ctx: Ctx) {
+  const session = await auth.api
+    .getSession({ headers: await headers() })
+    .catch(() => null);
+  if (!session) {
+    return NextResponse.json(
+      { success: false, error: { code: "UNAUTHORIZED", message: "请先登录" } },
+      { status: 401 },
+    );
+  }
+
+  const { id } = await ctx.params;
+  if (!z.string().uuid().safeParse(id).success) {
+    return NextResponse.json(
+      { success: false, error: { code: "VALIDATION_ERROR", message: "参数不合法" } },
+      { status: 400 },
+    );
+  }
+
+  const parsed = itemBodySchema.safeParse(await req.json().catch(() => null));
+  if (!parsed.success) {
+    return NextResponse.json(
+      { success: false, error: { code: "VALIDATION_ERROR", message: "表单数据不合法" } },
+      { status: 400 },
+    );
+  }
+
+  const result = await addTrainingItem({
+    userId: session.user.id,
+    trainingId: id,
+    exerciseId: parsed.data.exerciseId,
+    body: {
+      sets: parsed.data.sets,
+      reps: parsed.data.reps,
+      targetWeight: parsed.data.targetWeight ?? null,
+      restSeconds: parsed.data.restSeconds ?? 90,
+      note: parsed.data.note ?? null,
+    },
+    today: parsed.data.today,
+  });
+  if (!result.ok) return dayError(result.reason);
+
+  return NextResponse.json({ success: true, data: { item: result.data } }, { status: 201 });
+}

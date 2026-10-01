@@ -5,11 +5,12 @@
  *
  * - 空态:今天暂无训练 /【添加训练】【设为休息日】
  * - 一天多训练:卡片列表按添加顺序,重复"添加训练"为追加
- * - 添加/编辑训练:名称 + 部位多选(胸/背/肩/二头/三头/腿/核心)
+ * - 添加训练:名称 + 部位多选(胸/背/肩/二头/三头/腿/核心);操作:保存 / 下一步(→动作编排)
+ * - 点击训练卡进入训练编辑页(动作编排,3.1.6/3.1.7)
  * - 休息日:设(有训练时二次确认后移除计划)/取消;历史日期只读
  * - 保存成功 Toast"训练计划已保存"(3.1.12),立即 router.refresh 同步
  */
-import { ArrowLeft, Pencil, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Plus, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -34,11 +35,15 @@ function todayStr(): string {
 }
 
 type ApiError = { success: boolean; error?: { code: string; message: string } } | null;
+type CreateResult = {
+  success: boolean;
+  data?: { training: { id: string } };
+  error?: { code: string; message: string };
+} | null;
 
 export function DayEditor({ detail }: { detail: DayDetailView }) {
   const router = useRouter();
   const [formOpen, setFormOpen] = useState(false);
-  const [editing, setEditing] = useState<DayTrainingView | null>(null); // null = 添加
   const [name, setName] = useState("");
   const [groups, setGroups] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -48,41 +53,38 @@ export function DayEditor({ detail }: { detail: DayDetailView }) {
   const editable = !detail.readonly;
 
   function openAdd() {
-    setEditing(null);
     setName("");
     setGroups([]);
     setFormOpen(true);
   }
 
-  function openEdit(training: DayTrainingView) {
-    if (!editable) return;
-    setEditing(training);
-    setName(training.name);
-    setGroups(training.muscleGroup ? training.muscleGroup.split("+") : []);
-    setFormOpen(true);
-  }
-
-  async function handleSubmit() {
+  /** 3.1.5 操作:保存(留在日页) / 下一步(进动作编排,3.1.6) */
+  async function handleSubmit(goNext: boolean) {
     if (!formValid || submitting) return;
     setSubmitting(true);
     try {
-      const isCreate = editing === null;
-      const res = await fetch(
-        isCreate ? `/api/days/${detail.date}/trainings` : `/api/trainings/${editing.id}`,
-        {
-          method: isCreate ? "POST" : "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: name.trim(), muscleGroups: groups, today: todayStr(), ...(isCreate ? { cycleId: detail.cycleId } : {}) }),
-        },
-      );
-      const body = (await res.json().catch(() => null)) as ApiError;
-      if (!res.ok || !body?.success) {
+      const res = await fetch(`/api/days/${detail.date}/trainings`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: name.trim(),
+          muscleGroups: groups,
+          today: todayStr(),
+          cycleId: detail.cycleId,
+        }),
+      });
+      const body = (await res.json().catch(() => null)) as CreateResult;
+      if (!res.ok || !body?.success || !body.data) {
         toast.error(body?.error?.message ?? "保存失败,请重试");
         return;
       }
       toast.success("训练计划已保存");
       setFormOpen(false);
-      router.refresh();
+      if (goNext) {
+        router.push(`/workout/training?training=${body.data.training.id}`);
+      } else {
+        router.refresh();
+      }
     } catch {
       toast.error("网络异常,请检查网络后重试");
     } finally {
@@ -204,31 +206,29 @@ export function DayEditor({ detail }: { detail: DayDetailView }) {
               <button
                 type="button"
                 className="min-w-0 flex-1 text-left"
-                onClick={() => openEdit(training)}
-                disabled={!editable}
+                onClick={() =>
+                  router.push(`/workout/training?training=${training.id}`)
+                }
               >
                 <span className="block truncate font-medium">{training.name}</span>
                 <span className="block truncate text-xs text-muted-foreground">
                   {training.muscleGroup ?? "未设部位"} ·{" "}
-                  {training.itemCount > 0 ? `${training.itemCount} 个动作` : "未添加动作(下一步支持)"}
+                  {training.itemCount > 0
+                    ? `${training.itemCount} 个动作`
+                    : "未添加动作,点击编排"}
                 </span>
               </button>
               {editable && (
-                <span className="flex shrink-0 gap-1">
-                  <Button size="icon" variant="ghost" aria-label="编辑训练" onClick={() => openEdit(training)}>
-                    <Pencil className="size-4" />
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="text-destructive"
-                    aria-label="删除训练"
-                    disabled={busy}
-                    onClick={() => handleDelete(training)}
-                  >
-                    <Trash2 className="size-4" />
-                  </Button>
-                </span>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="text-destructive"
+                  aria-label="删除训练"
+                  disabled={busy}
+                  onClick={() => handleDelete(training)}
+                >
+                  <Trash2 className="size-4" />
+                </Button>
               )}
             </div>
           ))}
@@ -241,13 +241,13 @@ export function DayEditor({ detail }: { detail: DayDetailView }) {
         </div>
       )}
 
-      {/* 添加 / 编辑训练(3.1.5:名称 + 部位多选) */}
+      {/* 添加训练(3.1.5:名称 + 部位多选;操作:保存 / 下一步→动作编排) */}
       <Sheet open={formOpen} onOpenChange={setFormOpen}>
         <SheetContent>
           <SheetHeader>
-            <SheetTitle>{editing ? "编辑训练" : "添加训练"}</SheetTitle>
+            <SheetTitle>添加训练</SheetTitle>
             <SheetDescription>
-              {editing ? "修改训练名称或部位" : "同一天可添加多个训练,按添加顺序排列"}
+              同一天可添加多个训练,按添加顺序排列
             </SheetDescription>
           </SheetHeader>
           <div className="space-y-4 px-4 pb-8">
@@ -289,13 +289,22 @@ export function DayEditor({ detail }: { detail: DayDetailView }) {
               <Button variant="outline" className="flex-1" onClick={() => setFormOpen(false)}>
                 取消
               </Button>
-              <Button className="flex-1" onClick={handleSubmit} disabled={!formValid || submitting}>
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => handleSubmit(false)}
+                disabled={!formValid || submitting}
+              >
                 {submitting ? "保存中…" : "保存"}
               </Button>
+              <Button
+                className="flex-1"
+                onClick={() => handleSubmit(true)}
+                disabled={!formValid || submitting}
+              >
+                {submitting ? "保存中…" : "下一步"}
+              </Button>
             </div>
-            <p className="text-center text-xs text-muted-foreground">
-              动作编排将在保存后进入动作库选择(WORKOUT-003+,建设中)
-            </p>
           </div>
         </SheetContent>
       </Sheet>

@@ -146,6 +146,8 @@ export const exercises = pgTable("exercises", {
   /** 力量 / 有氧 / 自重 / 拉伸 */
   category: text("category").notNull(),
   muscleGroup: text("muscle_group").notNull(),
+  /** 动作备注(3.1.6 新建动作,可选) */
+  note: text("note"),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
 }, (t) => [
   index("exercises_owner_name_idx").on(t.ownerId, t.name),
@@ -160,6 +162,8 @@ export const trainingItems = pgTable("training_items", {
   reps: integer("reps").notNull(),
   targetWeight: numeric101("target_weight"),
   restSeconds: integer("rest_seconds").notNull().default(90),
+  /** 备注(3.1.7 动作参数,可选) */
+  note: text("note"),
   sortOrder: integer("sort_order").notNull().default(0),
 }, (t) => [
   index("training_items_training_idx").on(t.trainingId),

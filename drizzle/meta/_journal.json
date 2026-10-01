@@ -8,6 +8,13 @@
       "when": 1789367118901,
       "tag": "0000_dry_rogue",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1790516277601,
+      "tag": "0001_plain_lightspeed",
+      "breakpoints": true
     }
   ]
 }
