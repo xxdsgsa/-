@@ -11,6 +11,10 @@ const MAP: Record<string, { code: string; message: string; status: number }> = {
   IS_REST: { code: "VALIDATION_ERROR", message: "休息日不可添加训练,请先取消休息日", status: 400 },
   HAS_RECORDS: { code: "CONFLICT", message: "已有执行记录,无法删除", status: 409 },
   OFFICIAL_EXERCISE: { code: "FORBIDDEN", message: "官方动作不可修改或删除", status: 403 },
+  NOT_TODAY: { code: "VALIDATION_ERROR", message: "只能执行今天的训练", status: 400 },
+  SESSION_DONE: { code: "CONFLICT", message: "该训练已完成", status: 409 },
+  SESSION_CONFLICT: { code: "CONFLICT", message: "有未结束的训练,请先继续或结束它", status: 409 },
+  NOT_IN_PROGRESS: { code: "VALIDATION_ERROR", message: "训练已结束", status: 400 },
 };
 
 export function dayError(reason: string): NextResponse {

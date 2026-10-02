@@ -16,6 +16,7 @@ import {
   setLogs,
   trainingDays,
   trainingItems,
+  trainingSessions,
   trainings,
   trainingCycles,
   type TrainingItem,
@@ -52,6 +53,8 @@ export interface TrainingDetailView {
   muscleGroup: string | null;
   /** date < today:历史日期只读(3.1.5) */
   readonly: boolean;
+  /** 本训练执行状态(3.1.10):none 无 / in_progress 进行中(计划锁定) / done 已完成 */
+  sessionStatus: "none" | "in_progress" | "done";
   items: TrainingItemView[];
 }
 
@@ -65,22 +68,36 @@ export async function getTrainingDetail(
   if (!chain) return null;
   const { training, day, cycle } = chain;
 
-  const rows = await db
-    .select({
-      id: trainingItems.id,
-      exerciseId: trainingItems.exerciseId,
-      exerciseName: exercises.name,
-      sets: trainingItems.sets,
-      reps: trainingItems.reps,
-      targetWeight: trainingItems.targetWeight,
-      restSeconds: trainingItems.restSeconds,
-      note: trainingItems.note,
-      sortOrder: trainingItems.sortOrder,
-    })
-    .from(trainingItems)
-    .innerJoin(exercises, eq(trainingItems.exerciseId, exercises.id))
-    .where(eq(trainingItems.trainingId, training.id))
-    .orderBy(asc(trainingItems.sortOrder), asc(trainingItems.id));
+  const [rows, sessionRows] = await Promise.all([
+    db
+      .select({
+        id: trainingItems.id,
+        exerciseId: trainingItems.exerciseId,
+        exerciseName: exercises.name,
+        sets: trainingItems.sets,
+        reps: trainingItems.reps,
+        targetWeight: trainingItems.targetWeight,
+        restSeconds: trainingItems.restSeconds,
+        note: trainingItems.note,
+        sortOrder: trainingItems.sortOrder,
+      })
+      .from(trainingItems)
+      .innerJoin(exercises, eq(trainingItems.exerciseId, exercises.id))
+      .where(eq(trainingItems.trainingId, training.id))
+      .orderBy(asc(trainingItems.sortOrder), asc(trainingItems.id)),
+    db
+      .select({ status: trainingSessions.status })
+      .from(trainingSessions)
+      .where(
+        and(eq(trainingSessions.trainingId, training.id), eq(trainingSessions.userId, userId)),
+      ),
+  ]);
+
+  const sessionStatus = sessionRows.some((s) => s.status === "进行中")
+    ? ("in_progress" as const)
+    : sessionRows.some((s) => s.status === "已完成")
+      ? ("done" as const)
+      : ("none" as const);
 
   const [, m, d] = day.date.split("-");
   return {
@@ -92,6 +109,7 @@ export async function getTrainingDetail(
     name: training.name,
     muscleGroup: training.muscleGroup,
     readonly: day.date < (today ?? serverToday()),
+    sessionStatus,
     items: rows,
   };
 }
@@ -244,13 +262,14 @@ export async function moveTrainingItem(input: {
  * 内部:归属链校验(user → cycle → day → training/item)
  * ============================================================ */
 
-interface TrainingChain {
+export interface TrainingChain {
   training: typeof trainings.$inferSelect;
   day: typeof trainingDays.$inferSelect;
   cycle: typeof trainingCycles.$inferSelect;
 }
 
-async function findTraining(userId: string, trainingId: string): Promise<TrainingChain | null> {
+/** 归属链查询(训练编辑/执行服务层共用):user → cycle → day → training */
+export async function findTraining(userId: string, trainingId: string): Promise<TrainingChain | null> {
   const [row] = await db
     .select({ training: trainings, day: trainingDays, cycle: trainingCycles })
     .from(trainings)

@@ -14,6 +14,7 @@ import {
   ChevronUp,
   Copy,
   Pencil,
+  Play,
   Plus,
   Trash2,
 } from "lucide-react";
@@ -73,7 +74,11 @@ export function TrainingEditor({ detail }: { detail: TrainingDetailView }) {
   const [paramTarget, setParamTarget] = useState<ParamTarget | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<TrainingItemView | null>(null);
   const [busy, setBusy] = useState(false);
-  const editable = !detail.readonly;
+  // 计划锁定:历史只读 + 执行中/已完成(3.1.10 执行中不修改计划)
+  const locked = detail.sessionStatus !== "none";
+  const editable = !detail.readonly && !locked;
+  const canStart = !detail.readonly && detail.sessionStatus === "none" && detail.date === todayStr();
+  const executeHref = `/workout/execute?training=${detail.trainingId}`;
 
   const backHref = `/workout/day?cycle=${detail.cycleId}&date=${detail.date}`;
 
@@ -234,6 +239,26 @@ export function TrainingEditor({ detail }: { detail: TrainingDetailView }) {
         <p className="mt-4 rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
           历史日期只读,不可修改计划
         </p>
+      )}
+      {detail.sessionStatus === "in_progress" && (
+        <div className="mt-4 flex items-center justify-between gap-3 rounded-lg bg-primary/10 px-3 py-2">
+          <p className="text-xs font-medium text-primary">训练进行中,计划已锁定</p>
+          <Button size="sm" onClick={() => router.push(executeHref)}>
+            <Play className="size-4" />
+            继续训练
+          </Button>
+        </div>
+      )}
+      {detail.sessionStatus === "done" && (
+        <p className="mt-4 rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
+          该训练已完成
+        </p>
+      )}
+      {canStart && (
+        <Button className="mt-4 w-full" size="lg" onClick={() => router.push(executeHref)}>
+          <Play className="size-4" />
+          开始训练
+        </Button>
       )}
 
       {/* 动作列表(3.1.7:①卧推 → ②上斜卧推 → …) */}
