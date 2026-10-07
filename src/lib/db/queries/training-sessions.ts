@@ -8,9 +8,12 @@
  * - 跳过动作:为剩余未完成组生成 completed=false 行(不动已完成行,3.2.7)
  * - 结束:提前结束或全部完成 → status=已完成 + durationSeconds(3.2.7:完成≥1组记"已完成"由
  *   四态判定已有逻辑自动处理,本层不管)
+ * - 总结(3.5)与历史(WORKOUT-007):set_logs 聚合只统计 completed 组;无重量不折算容量;
+ *   归属经 session.user_id,不经 cycle(周期删除后历史保留可见,3.1.4/3.2.8)
  */
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 
+import { weekdayCN } from "@/lib/cycles";
 import { serverToday } from "@/lib/date";
 
 import { db } from "@/db";
@@ -52,6 +55,8 @@ export interface ExecutionView {
   mode: "ready" | "executing" | "done" | "conflict";
   /** 进行中 session(executing 时必有;startedAt 为 ISO 串,客户端计时起点) */
   session: { id: string; startedAt: string } | null;
+  /** 已完成 session id(done 模式"查看总结"入口) */
+  doneSessionId: string | null;
   /** conflict 时的进行中训练(跳转目标) */
   conflict: { trainingId: string; trainingName: string } | null;
   items: ExecutingItemView[];
@@ -155,6 +160,7 @@ export async function getExecutionView(
     session: mineInProgress
       ? { id: mineInProgress.id, startedAt: mineInProgress.startedAt.toISOString() }
       : null,
+    doneSessionId: mineDone?.id ?? null,
     conflict,
     items: items.map((i) => ({
       itemId: i.itemId,
@@ -167,6 +173,181 @@ export async function getExecutionView(
       logs: logsByItem.get(i.itemId) ?? [],
     })),
   };
+}
+
+/* ============================================================
+ * 读:训练总结页(3.5 / WORKOUT-007 数据源)
+ * ============================================================ */
+
+export interface SummaryItemView {
+  itemId: string;
+  name: string;
+  /** 计划组数 */
+  plannedSets: number;
+  reps: number;
+  /** 完成组数(≤ plannedSets) */
+  completedSets: number;
+}
+
+export interface SessionSummaryView {
+  sessionId: string;
+  trainingId: string;
+  trainingName: string;
+  /** 进行中 / 已完成 */
+  status: string;
+  date: string;
+  dayLabel: string;
+  weekday: string;
+  durationSeconds: number | null;
+  /** 动作总数 */
+  totalItems: number;
+  /** 全部组完成的动作数(3.5.2 完成动作数分子) */
+  completedItems: number;
+  /** 完成组总数(3.5.3:未完成组不计入) */
+  completedSets: number;
+  /** Σ 实际重量×实际次数(仅完成组;无重量不折算 → null) */
+  volume: number | null;
+  items: SummaryItemView[];
+}
+
+/**
+ * 训练总结页数据(3.5.3):逐组记录为唯一数据源,只读不可编辑。
+ * 归属校验:user 直接持有 session(user_id),不经 cycle(周期软删后历史仍可查,3.1.4)。
+ */
+export async function getSessionSummary(
+  userId: string,
+  sessionId: string,
+): Promise<SessionSummaryView | null> {
+  const [row] = await db
+    .select({
+      sessionId: trainingSessions.id,
+      trainingId: trainingSessions.trainingId,
+      date: trainingSessions.date,
+      status: trainingSessions.status,
+      durationSeconds: trainingSessions.durationSeconds,
+      trainingName: trainings.name,
+    })
+    .from(trainingSessions)
+    .innerJoin(trainings, eq(trainingSessions.trainingId, trainings.id))
+    .where(and(eq(trainingSessions.id, sessionId), eq(trainingSessions.userId, userId)))
+    .limit(1);
+  if (!row) return null;
+
+  const [items, logs] = await Promise.all([
+    db
+      .select({
+        itemId: trainingItems.id,
+        name: exercises.name,
+        plannedSets: trainingItems.sets,
+        reps: trainingItems.reps,
+      })
+      .from(trainingItems)
+      .innerJoin(exercises, eq(trainingItems.exerciseId, exercises.id))
+      .where(eq(trainingItems.trainingId, row.trainingId))
+      .orderBy(asc(trainingItems.sortOrder), asc(trainingItems.id)),
+    db
+      .select({
+        trainingItemId: setLogs.trainingItemId,
+        completedSets: sql<number>`cast(count(*) filter (where ${setLogs.completed}) as int)`,
+        volume: sql<number>`cast(coalesce(sum(${setLogs.actualWeight} * ${setLogs.actualReps}) filter (where ${setLogs.completed} and ${setLogs.actualWeight} is not null), 0) as double precision)`,
+      })
+      .from(setLogs)
+      .where(eq(setLogs.sessionId, sessionId))
+      .groupBy(setLogs.trainingItemId),
+  ]);
+
+  const logMap = new Map(logs.map((l) => [l.trainingItemId, l]));
+  const itemViews = items.map((it) => ({
+    itemId: it.itemId,
+    name: it.name,
+    plannedSets: it.plannedSets,
+    reps: it.reps,
+    completedSets: logMap.get(it.itemId)?.completedSets ?? 0,
+  }));
+  const totalVolume = logs.reduce((sum, l) => sum + l.volume, 0);
+
+  const [, m, d] = row.date.split("-");
+  return {
+    sessionId: row.sessionId,
+    trainingId: row.trainingId,
+    trainingName: row.trainingName,
+    status: row.status,
+    date: row.date,
+    dayLabel: `${Number(m)}月${Number(d)}日`,
+    weekday: weekdayCN(row.date),
+    durationSeconds: row.durationSeconds,
+    totalItems: itemViews.length,
+    completedItems: itemViews.filter((it) => it.completedSets >= it.plannedSets).length,
+    completedSets: itemViews.reduce((sum, it) => sum + it.completedSets, 0),
+    volume: totalVolume > 0 ? totalVolume : null,
+    items: itemViews,
+  };
+}
+
+/* ============================================================
+ * 读:训练历史列表(WORKOUT-007)
+ * ============================================================ */
+
+export interface HistoryEntryView {
+  sessionId: string;
+  date: string;
+  dayLabel: string;
+  weekday: string;
+  trainingName: string;
+  durationSeconds: number | null;
+  completedSets: number;
+  /** 容量(无重量记录为 null,展示时省略) */
+  volume: number | null;
+}
+
+/**
+ * 训练历史:已完成 sessions 按日期倒序(WORKOUT-007)。
+ * 历史只读(3.2.8);不经 cycle 归属,周期删除后记录仍保留可见。
+ */
+export async function listHistorySessions(
+  userId: string,
+  limit = 100,
+): Promise<HistoryEntryView[]> {
+  const sessions = await db
+    .select({
+      sessionId: trainingSessions.id,
+      date: trainingSessions.date,
+      durationSeconds: trainingSessions.durationSeconds,
+      trainingName: trainings.name,
+    })
+    .from(trainingSessions)
+    .innerJoin(trainings, eq(trainingSessions.trainingId, trainings.id))
+    .where(and(eq(trainingSessions.userId, userId), eq(trainingSessions.status, "已完成")))
+    .orderBy(desc(trainingSessions.date), desc(trainingSessions.startedAt))
+    .limit(limit);
+
+  if (sessions.length === 0) return [];
+
+  const stats = await db
+    .select({
+      sessionId: setLogs.sessionId,
+      completedSets: sql<number>`cast(count(*) filter (where ${setLogs.completed}) as int)`,
+      volume: sql<number>`cast(coalesce(sum(${setLogs.actualWeight} * ${setLogs.actualReps}) filter (where ${setLogs.completed} and ${setLogs.actualWeight} is not null), 0) as double precision)`,
+    })
+    .from(setLogs)
+    .where(inArray(setLogs.sessionId, sessions.map((s) => s.sessionId)))
+    .groupBy(setLogs.sessionId);
+
+  const statMap = new Map(stats.map((s) => [s.sessionId, s]));
+  return sessions.map((s) => {
+    const stat = statMap.get(s.sessionId);
+    const [, m, d] = s.date.split("-");
+    return {
+      sessionId: s.sessionId,
+      date: s.date,
+      dayLabel: `${Number(m)}月${Number(d)}日`,
+      weekday: weekdayCN(s.date),
+      trainingName: s.trainingName,
+      durationSeconds: s.durationSeconds,
+      completedSets: stat?.completedSets ?? 0,
+      volume: stat && stat.volume > 0 ? stat.volume : null,
+    };
+  });
 }
 
 /* ============================================================

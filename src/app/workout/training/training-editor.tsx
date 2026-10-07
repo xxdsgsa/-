@@ -250,9 +250,20 @@ export function TrainingEditor({ detail }: { detail: TrainingDetailView }) {
         </div>
       )}
       {detail.sessionStatus === "done" && (
-        <p className="mt-4 rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
-          该训练已完成
-        </p>
+        <div className="mt-4 flex items-center justify-between gap-3 rounded-lg bg-muted px-3 py-2">
+          <p className="text-xs text-muted-foreground">该训练已完成</p>
+          {detail.lastDoneSessionId && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() =>
+                router.push(`/workout/summary?session=${detail.lastDoneSessionId}`)
+              }
+            >
+              查看总结
+            </Button>
+          )}
+        </div>
       )}
       {canStart && (
         <Button className="mt-4 w-full" size="lg" onClick={() => router.push(executeHref)}>

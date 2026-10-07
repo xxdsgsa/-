@@ -20,3 +20,11 @@ export function formatDateLabel(dateStr: string): string {
   const [, m, d] = dateStr.split("-");
   return `${Number(m)}月${Number(d)}日`;
 }
+
+/** 秒 → "58分钟" / "1小时5分钟" / "45秒"(总结页与训练历史共用,PRD 3.5) */
+export function formatDuration(seconds: number): string {
+  if (seconds < 60) return `${seconds}秒`;
+  const h = Math.floor(seconds / 3600);
+  const m = Math.round((seconds % 3600) / 60);
+  return h > 0 ? `${h}小时${m}分钟` : `${m}分钟`;
+}

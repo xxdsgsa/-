@@ -249,7 +249,7 @@ export function ExecuteClient({ view }: { view: ExecutionView }) {
     void autoFinish();
   }
 
-  /* ---------- 结束训练 ---------- */
+  /* ---------- 结束训练(全部完成/提前结束统一入口,3.2.7) ---------- */
   async function autoFinish() {
     if (!view.session) return;
     const err = await post(`/api/sessions/${view.session.id}/finish`, {});
@@ -258,7 +258,8 @@ export function ExecuteClient({ view }: { view: ExecutionView }) {
       return;
     }
     toast.success("训练完成!");
-    router.push(backHref);
+    // 自动进入训练总结页(3.1.10/3.2.7);replace 使返回键不回到执行态
+    router.replace(`/workout/summary?session=${view.session.id}`);
   }
 
   const hasIncomplete = view.items.some((it) =>
@@ -333,7 +334,11 @@ export function ExecuteClient({ view }: { view: ExecutionView }) {
         <div className="mt-10 flex flex-col items-center gap-3 text-center">
           <span className="text-3xl">✅</span>
           <p className="font-medium">该训练已完成</p>
-          <p className="text-sm text-muted-foreground">训练总结页建设中,今日状态已更新</p>
+          {view.doneSessionId && (
+            <Button onClick={() => router.push(`/workout/summary?session=${view.doneSessionId}`)}>
+              查看总结
+            </Button>
+          )}
           <Button variant="outline" onClick={() => router.push(backHref)}>
             返回训练日
           </Button>

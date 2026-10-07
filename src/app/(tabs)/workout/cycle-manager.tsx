@@ -10,7 +10,8 @@
  * - 周期/周选择由 URL 查询参数驱动(RSC 直出),切换即 router.push
  * - 创建/激活遇已有进行中周期 → 409,确认"结束并激活新周期?"后带 force 重发(3.1.4)
  */
-import { ChevronDown, ChevronLeft, ChevronRight, Pencil, Play, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, History, Pencil, Play, Plus, Trash2 } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -253,9 +254,16 @@ export function CycleManager({
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold">训练计划</h1>
         {cycles.length > 0 && (
-          <Button size="icon" variant="outline" onClick={openCreate} aria-label="新建训练周期">
-            <Plus className="size-4" />
-          </Button>
+          <div className="flex gap-2">
+            <Button size="icon" variant="outline" asChild aria-label="训练历史">
+              <Link href="/workout/history">
+                <History className="size-4" />
+              </Link>
+            </Button>
+            <Button size="icon" variant="outline" onClick={openCreate} aria-label="新建训练周期">
+              <Plus className="size-4" />
+            </Button>
+          </div>
         )}
       </div>
 

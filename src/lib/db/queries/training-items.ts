@@ -55,6 +55,8 @@ export interface TrainingDetailView {
   readonly: boolean;
   /** 本训练执行状态(3.1.10):none 无 / in_progress 进行中(计划锁定) / done 已完成 */
   sessionStatus: "none" | "in_progress" | "done";
+  /** 最近已完成 session(已完成横幅"查看总结"入口) */
+  lastDoneSessionId: string | null;
   items: TrainingItemView[];
 }
 
@@ -86,7 +88,7 @@ export async function getTrainingDetail(
       .where(eq(trainingItems.trainingId, training.id))
       .orderBy(asc(trainingItems.sortOrder), asc(trainingItems.id)),
     db
-      .select({ status: trainingSessions.status })
+      .select({ id: trainingSessions.id, status: trainingSessions.status })
       .from(trainingSessions)
       .where(
         and(eq(trainingSessions.trainingId, training.id), eq(trainingSessions.userId, userId)),
@@ -98,6 +100,7 @@ export async function getTrainingDetail(
     : sessionRows.some((s) => s.status === "已完成")
       ? ("done" as const)
       : ("none" as const);
+  const lastDoneSessionId = sessionRows.find((s) => s.status === "已完成")?.id ?? null;
 
   const [, m, d] = day.date.split("-");
   return {
@@ -110,6 +113,7 @@ export async function getTrainingDetail(
     muscleGroup: training.muscleGroup,
     readonly: day.date < (today ?? serverToday()),
     sessionStatus,
+    lastDoneSessionId,
     items: rows,
   };
 }
