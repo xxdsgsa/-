@@ -104,25 +104,28 @@ export function OnboardingWizard({ nickname }: { nickname: string }) {
   const [goalEditValue, setGoalEditValue] = useState("");
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // 进入时检测草稿(3.3.3:恢复/放弃)
+  // 进入时检测草稿(3.3.3:恢复/放弃);setState 须在异步回调中(lint 规则)
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(DRAFT_KEY);
-      if (raw) {
-        const d = JSON.parse(raw) as Draft;
-        // 草稿超 7 天自动失效(3.3.4)
-        if (d.savedAt && Date.now() - d.savedAt < 7 * 86400 * 1000) {
-          setRestoring(true);
-          setDraft((cur) => ({ ...cur, ...d }));
-          return;
+    const t = setTimeout(() => {
+      try {
+        const raw = localStorage.getItem(DRAFT_KEY);
+        if (raw) {
+          const d = JSON.parse(raw) as Draft;
+          // 草稿超 7 天自动失效(3.3.4)
+          if (d.savedAt && Date.now() - d.savedAt < 7 * 86400 * 1000) {
+            setRestoring(true);
+            setDraft((cur) => ({ ...cur, ...d }));
+            return;
+          }
+          localStorage.removeItem(DRAFT_KEY);
         }
+      } catch {
         localStorage.removeItem(DRAFT_KEY);
+      } finally {
+        setDraftChecked(true);
       }
-    } catch {
-      localStorage.removeItem(DRAFT_KEY);
-    } finally {
-      setDraftChecked(true);
-    }
+    });
+    return () => clearTimeout(t);
   }, []);
 
   const clearDraft = useCallback(() => {

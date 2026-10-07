@@ -10,8 +10,6 @@ import { drizzle } from "drizzle-orm/neon-http";
 
 import { exercises, foods } from "./schema";
 
-/* eslint-disable no-console */
-
 type ExerciseSeed = { name: string; category: string; muscleGroup: string };
 
 const STRENGTH = "力量";

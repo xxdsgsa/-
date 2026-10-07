@@ -14,7 +14,7 @@
  */
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -315,11 +315,12 @@ function NutritionCard({ nutrition }: { nutrition: DashboardData["nutrition"] })
 function WaterCard({ water }: { water: DashboardData["water"] }) {
   const router = useRouter();
   const [total, setTotal] = useState(water.currentMl);
-
-  // 服务端数据变化(refresh 后)同步本地乐观值
-  useEffect(() => {
+  // 服务端数据变化(refresh 后)同步本地乐观值(渲染期调整,替代 effect 内 setState)
+  const [lastServerMl, setLastServerMl] = useState(water.currentMl);
+  if (water.currentMl !== lastServerMl) {
+    setLastServerMl(water.currentMl);
     setTotal(water.currentMl);
-  }, [water.currentMl]);
+  }
 
   const p = pct(total, water.goalMl);
   const over = p != null && p > 100;
@@ -382,11 +383,13 @@ function SupplementCard({ supplements }: { supplements: DashboardData["supplemen
   const [selectedId, setSelectedId] = useState<string | null>(list[0]?.id ?? null);
   const [dose, setDose] = useState(list[0] ? String(Number(list[0].dose)) : "");
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
+  // 服务端列表变化(refresh 后)重置默认选中(渲染期调整,替代 effect 内 setState)
+  const [lastList, setLastList] = useState(list);
+  if (list !== lastList) {
+    setLastList(list);
     setSelectedId(list[0]?.id ?? null);
     setDose(list[0] ? String(Number(list[0].dose)) : "");
-  }, [list]);
+  }
 
   const selected = list.find((s) => s.id === selectedId) ?? null;
   const hasTarget = targetCount > 0;
