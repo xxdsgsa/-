@@ -312,7 +312,7 @@ function NutritionCard({ nutrition }: { nutrition: DashboardData["nutrition"] })
 
 /* --------------------------------- 饮水卡 ---------------------------------- */
 
-function WaterCard({ water }: { water: DashboardData["water"] }) {
+export function WaterCard({ water }: { water: DashboardData["water"] }) {
   const router = useRouter();
   const [total, setTotal] = useState(water.currentMl);
   // 服务端数据变化(refresh 后)同步本地乐观值(渲染期调整,替代 effect 内 setState)
@@ -375,7 +375,7 @@ function WaterCard({ water }: { water: DashboardData["water"] }) {
 
 /* --------------------------------- 补剂卡 ---------------------------------- */
 
-function SupplementCard({ supplements }: { supplements: DashboardData["supplements"] }) {
+export function SupplementCard({ supplements }: { supplements: DashboardData["supplements"] }) {
   const router = useRouter();
   const { list, todayCount, targetCount } = supplements;
 

@@ -186,8 +186,8 @@ async function getNutritionCard(userId: string, today: string) {
   };
 }
 
-/** 饮水卡:当日总量 × waterMl 目标 */
-async function getWaterCard(userId: string, today: string) {
+/** 饮水卡:当日总量 × waterMl 目标(饮食页快捷卡复用,PRD 3.8.2) */
+export async function getWaterCard(userId: string, today: string) {
   const [row] = await db
     .select({ total: sql<string>`coalesce(sum(${waterLogs.amountMl}), 0)` })
     .from(waterLogs)
@@ -196,8 +196,8 @@ async function getWaterCard(userId: string, today: string) {
   return { currentMl: Number(row?.total ?? 0), goalMl: goals?.waterMl ?? null };
 }
 
-/** 补剂卡:活跃列表 + 当日打卡数 + Σ每日目标(3.9.4) */
-async function getSupplementCard(userId: string, today: string) {
+/** 补剂卡:活跃列表 + 当日打卡数 + Σ每日目标(3.9.4;饮食页快捷卡复用) */
+export async function getSupplementCard(userId: string, today: string) {
   const [list, [cnt]] = await Promise.all([
     db
       .select({ id: supplements.id, name: supplements.name, unit: supplements.unit, dose: supplements.dose, dailyTarget: supplements.dailyTarget })
