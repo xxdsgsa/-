@@ -40,8 +40,11 @@ export default function LoginPage() {
         return;
       }
       toast.success("登录成功");
-      // 未完成首次设置 → 引导完成(PRD 3.6.6)
-      router.push(data?.user?.onboardedAt ? "/dashboard" : "/onboarding");
+      // 跳 /dashboard,由 (tabs)/layout.tsx 守卫统一兜底:
+      // - 已完成 onboarding → 留在 /dashboard
+      // - 未完成 onboarding → 守卫推回 /onboarding
+      // 这样不再依赖 session payload 中 onboardedAt 字段的透传(Batch 1)。
+      router.push("/dashboard");
     } catch {
       toast.error("网络异常,请稍后再试");
     } finally {

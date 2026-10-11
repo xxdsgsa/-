@@ -2,6 +2,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/lib/auth";
+import { isOnboarded } from "@/lib/db/queries/onboarding";
 import { OnboardingWizard } from "./wizard";
 
 /**
@@ -13,7 +14,7 @@ export default async function OnboardingPage() {
     .getSession({ headers: await headers() })
     .catch(() => null);
   if (!session) redirect("/login");
-  if (session.user.onboardedAt) redirect("/dashboard");
+  if (await isOnboarded(session.user.id)) redirect("/dashboard");
 
   return <OnboardingWizard nickname={session.user.name || "FitMate 用户"} />;
 }
