@@ -1,0 +1,2 @@
+# 强制 LF 入库,避免 Windows 换行警告和跨平台 diff 噪音
+* text=auto eol=lf

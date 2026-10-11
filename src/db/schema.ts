@@ -203,6 +203,10 @@ export const setLogs = pgTable("set_logs", {
 }, (t) => [
   index("set_logs_session_idx").on(t.sessionId),
   index("set_logs_item_idx").on(t.trainingItemId),
+  // Batch 2A:每会话/动作/组号 物理唯一;logSet 应用层已幂等覆盖,
+  // 此约束兜底历史脏数据 + 未来并发/超时场景。
+  // 迁移见 drizzle/0002_set_log_unique.sql(预检合并 + 约束)。
+  uniqueIndex("set_log_session_item_index_uidx").on(t.sessionId, t.trainingItemId, t.setIndex),
 ]);
 
 /** 手动标记(未完成;同日撤销 = 删行,3.1.9) */
