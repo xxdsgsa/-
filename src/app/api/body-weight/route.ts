@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { requireUserId } from "@/lib/api/auth";
+import { parseJsonBody } from "@/lib/api/parse";
 import { serverToday } from "@/lib/date";
 import {
   getBodyWeightForDate,
@@ -26,15 +27,13 @@ export async function POST(req: NextRequest) {
   const { userId, error } = await requireUserId();
   if (error) return error;
 
-  const parsed = bodySchema.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) {
-    return NextResponse.json(
-      { success: false, error: { code: "VALIDATION_ERROR", message: "请输入正确体重(20~300kg)" } },
-      { status: 400 },
-    );
-  }
-
-  const { weightKg, overwrite } = parsed.data;
+  const { data, error: parseError } = await parseJsonBody(
+    req,
+    bodySchema,
+    "请输入正确体重(20~300kg)",
+  );
+  if (parseError) return parseError;
+  const { weightKg, overwrite } = data;
   const today = serverToday();
 
   const existing = await getBodyWeightForDate(userId, today);
