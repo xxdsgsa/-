@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { requireUserId } from "@/lib/api/auth";
+import { parseJsonBody } from "@/lib/api/parse";
 import { serverToday } from "@/lib/date";
 import { addSupplementLog, getTodaySupplementCount } from "@/lib/db/queries/supplements";
 
@@ -24,15 +25,13 @@ export async function POST(req: NextRequest) {
   const { userId, error } = await requireUserId();
   if (error) return error;
 
-  const parsed = bodySchema.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) {
-    return NextResponse.json(
-      { success: false, error: { code: "VALIDATION_ERROR", message: "请选择补剂并输入正确剂量" } },
-      { status: 400 },
-    );
-  }
-
-  const { supplementId, dose } = parsed.data;
+  const { data, error: parseError } = await parseJsonBody(
+    req,
+    bodySchema,
+    "请选择补剂并输入正确剂量",
+  );
+  if (parseError) return parseError;
+  const { supplementId, dose } = data;
   const today = serverToday();
   const ok = await addSupplementLog({
     userId,

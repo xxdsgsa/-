@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { requireUserId } from "@/lib/api/auth";
+import { parseJsonBody } from "@/lib/api/parse";
 import { dayError } from "@/lib/api-days";
 import { setDayRest } from "@/lib/db/queries/training-days";
 
@@ -33,20 +34,19 @@ export async function POST(req: NextRequest, ctx: Ctx) {
     );
   }
 
-  const parsed = bodySchema.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) {
-    return NextResponse.json(
-      { success: false, error: { code: "VALIDATION_ERROR", message: "表单数据不合法" } },
-      { status: 400 },
-    );
-  }
+  const { data, error: parseError } = await parseJsonBody(
+    req,
+    bodySchema,
+    "表单数据不合法",
+  );
+  if (parseError) return parseError;
 
   const result = await setDayRest({
     userId,
-    cycleId: parsed.data.cycleId,
+    cycleId: data.cycleId,
     date,
-    isRest: parsed.data.isRest,
-    today: parsed.data.today,
+    isRest: data.isRest,
+    today: data.today,
   });
   if (!result.ok) {
     return dayError(result.reason);
