@@ -9,6 +9,7 @@ import { headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
+import { parseJsonBody } from "@/lib/api/parse";
 import { auth } from "@/lib/auth";
 
 const bodySchema = z.object({
@@ -16,17 +17,16 @@ const bodySchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const parsed = bodySchema.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) {
-    return NextResponse.json(
-      { success: false, error: { code: "VALIDATION_ERROR", message: "密码格式不正确" } },
-      { status: 400 },
-    );
-  }
+  const { data, error: parseError } = await parseJsonBody(
+    req,
+    bodySchema,
+    "密码格式不正确",
+  );
+  if (parseError) return parseError;
 
   try {
     await auth.api.setPassword({
-      body: { newPassword: parsed.data.newPassword },
+      body: { newPassword: data.newPassword },
       headers: await headers(), // 转发会话 Cookie
     });
     return NextResponse.json({ success: true, data: null });
