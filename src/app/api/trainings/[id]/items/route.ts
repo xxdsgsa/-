@@ -4,11 +4,10 @@
  * 参数:组数*(≥1) / 次数*(≥1) / 目标重量(可选,≥0) / 休息时间(可选,默认90秒) / 备注(可选)。
  * 同一动作可重复添加(3.2.9);追加序即动作顺序①②③。
  */
-import { headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
-import { auth } from "@/lib/auth";
+import { requireUserId } from "@/lib/api/auth";
 import { dayError } from "@/lib/api-days";
 import { addTrainingItem } from "@/lib/db/queries/training-items";
 
@@ -28,15 +27,8 @@ const itemBodySchema = z.object({
 type Ctx = { params: Promise<{ id: string }> };
 
 export async function POST(req: NextRequest, ctx: Ctx) {
-  const session = await auth.api
-    .getSession({ headers: await headers() })
-    .catch(() => null);
-  if (!session) {
-    return NextResponse.json(
-      { success: false, error: { code: "UNAUTHORIZED", message: "请先登录" } },
-      { status: 401 },
-    );
-  }
+  const { userId, error } = await requireUserId();
+  if (error) return error;
 
   const { id } = await ctx.params;
   if (!z.string().uuid().safeParse(id).success) {
@@ -55,7 +47,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
   }
 
   const result = await addTrainingItem({
-    userId: session.user.id,
+    userId,
     trainingId: id,
     exerciseId: parsed.data.exerciseId,
     body: {

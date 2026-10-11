@@ -4,11 +4,10 @@
  * 仅当天训练可开始;本训练进行中幂等返回(resumed=true,中断恢复);
  * 其他训练进行中 → 409 SESSION_CONFLICT;已完成 → 409 SESSION_DONE。
  */
-import { headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
-import { auth } from "@/lib/auth";
+import { requireUserId } from "@/lib/api/auth";
 import { dayError } from "@/lib/api-days";
 import { startSession } from "@/lib/db/queries/training-sessions";
 
@@ -21,15 +20,8 @@ const bodySchema = z.object({
 type Ctx = { params: Promise<{ id: string }> };
 
 export async function POST(req: NextRequest, ctx: Ctx) {
-  const session = await auth.api
-    .getSession({ headers: await headers() })
-    .catch(() => null);
-  if (!session) {
-    return NextResponse.json(
-      { success: false, error: { code: "UNAUTHORIZED", message: "请先登录" } },
-      { status: 401 },
-    );
-  }
+  const { userId, error } = await requireUserId();
+  if (error) return error;
 
   const { id } = await ctx.params;
   if (!z.string().uuid().safeParse(id).success) {
@@ -48,7 +40,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
   }
 
   const result = await startSession({
-    userId: session.user.id,
+    userId,
     trainingId: id,
     today: parsed.data.today,
   });

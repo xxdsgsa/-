@@ -3,11 +3,10 @@
  * PATCH  改重量(读取时按快照重算营养;超 7 天窗口只读)
  * DELETE 删条目,删除后统计重算
  */
-import { headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
-import { auth } from "@/lib/auth";
+import { requireUserId } from "@/lib/api/auth";
 import { dietError } from "@/lib/api-diet";
 import { deleteDietItem, updateDietItem } from "@/lib/db/queries/diet";
 
@@ -25,18 +24,9 @@ const bodySchema = z.object({
   today: z.string().regex(DATE_RE).optional(),
 });
 
-async function session() {
-  return auth.api.getSession({ headers: await headers() }).catch(() => null);
-}
-
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const s = await session();
-  if (!s) {
-    return NextResponse.json(
-      { success: false, error: { code: "UNAUTHORIZED", message: "请先登录" } },
-      { status: 401 },
-    );
-  }
+  const { userId, error } = await requireUserId();
+  if (error) return error;
   const { id } = await params;
   if (!UUID_RE.test(id)) {
     return NextResponse.json(
@@ -54,7 +44,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   const r = await updateDietItem({
-    userId: s.user.id,
+    userId,
     itemId: id,
     grams: parsed.data.grams,
     today: parsed.data.today,
@@ -64,13 +54,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const s = await session();
-  if (!s) {
-    return NextResponse.json(
-      { success: false, error: { code: "UNAUTHORIZED", message: "请先登录" } },
-      { status: 401 },
-    );
-  }
+  const { userId, error } = await requireUserId();
+  if (error) return error;
   const { id } = await params;
   if (!UUID_RE.test(id)) {
     return NextResponse.json(
@@ -80,7 +65,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   }
 
   const today = req.nextUrl.searchParams.get("today") ?? undefined;
-  const r = await deleteDietItem({ userId: s.user.id, itemId: id, today });
+  const r = await deleteDietItem({ userId, itemId: id, today });
   if (!r.ok) return dietError(r.reason);
   return NextResponse.json({ success: true, data: null });
 }

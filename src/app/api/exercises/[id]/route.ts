@@ -4,11 +4,10 @@
  * PATCH   编辑我的动作(名称/肌群/备注)
  * DELETE  软删我的动作;官方动作一律 403(官方不可删)
  */
-import { headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
-import { auth } from "@/lib/auth";
+import { requireUserId } from "@/lib/api/auth";
 import { dayError } from "@/lib/api-days";
 import { MUSCLE_GROUPS } from "@/lib/cycles";
 import { deleteExercise, updateExercise } from "@/lib/db/queries/exercises";
@@ -21,18 +20,9 @@ const bodySchema = z.object({
 
 type Ctx = { params: Promise<{ id: string }> };
 
-async function session() {
-  return auth.api.getSession({ headers: await headers() }).catch(() => null);
-}
-
 export async function PATCH(req: NextRequest, ctx: Ctx) {
-  const s = await session();
-  if (!s) {
-    return NextResponse.json(
-      { success: false, error: { code: "UNAUTHORIZED", message: "请先登录" } },
-      { status: 401 },
-    );
-  }
+  const { userId, error } = await requireUserId();
+  if (error) return error;
 
   const { id } = await ctx.params;
   if (!z.string().uuid().safeParse(id).success) {
@@ -51,7 +41,7 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
   }
 
   const result = await updateExercise({
-    userId: s.user.id,
+    userId,
     exerciseId: id,
     name: parsed.data.name,
     muscleGroup: parsed.data.muscleGroup,
@@ -63,13 +53,8 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
 }
 
 export async function DELETE(_req: NextRequest, ctx: Ctx) {
-  const s = await session();
-  if (!s) {
-    return NextResponse.json(
-      { success: false, error: { code: "UNAUTHORIZED", message: "请先登录" } },
-      { status: 401 },
-    );
-  }
+  const { userId, error } = await requireUserId();
+  if (error) return error;
 
   const { id } = await ctx.params;
   if (!z.string().uuid().safeParse(id).success) {
@@ -79,7 +64,7 @@ export async function DELETE(_req: NextRequest, ctx: Ctx) {
     );
   }
 
-  const result = await deleteExercise(s.user.id, id);
+  const result = await deleteExercise(userId, id);
   if (!result.ok) return dayError(result.reason);
 
   return NextResponse.json({ success: true, data: null });

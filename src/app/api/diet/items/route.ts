@@ -2,11 +2,10 @@
  * /api/diet/items —— 添加饮食条目(PRD 3.8.3 / NUTRITION-001/003)
  * POST { date, mealType, foodId, grams } 校验 7 天补记窗口与重量 1~5000
  */
-import { headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
-import { auth } from "@/lib/auth";
+import { requireUserId } from "@/lib/api/auth";
 import { dietError } from "@/lib/api-diet";
 import { addDietItem, MEAL_TYPES } from "@/lib/db/queries/diet";
 
@@ -26,13 +25,8 @@ const bodySchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const s = await auth.api.getSession({ headers: await headers() }).catch(() => null);
-  if (!s) {
-    return NextResponse.json(
-      { success: false, error: { code: "UNAUTHORIZED", message: "请先登录" } },
-      { status: 401 },
-    );
-  }
+  const { userId, error } = await requireUserId();
+  if (error) return error;
 
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
@@ -43,7 +37,7 @@ export async function POST(req: NextRequest) {
   }
 
   const r = await addDietItem({
-    userId: s.user.id,
+    userId,
     date: parsed.data.date,
     mealType: parsed.data.mealType,
     foodId: parsed.data.foodId,

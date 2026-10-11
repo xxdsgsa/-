@@ -4,11 +4,10 @@
  * GET  ?search=&muscle=  官方+我的动作列表(我的在前);搜索名称,筛选肌群
  * POST 新建自定义动作(名称* / 肌群* / 备注可选),保存后加入"我的动作"
  */
-import { headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
-import { auth } from "@/lib/auth";
+import { requireUserId } from "@/lib/api/auth";
 import { MUSCLE_GROUPS } from "@/lib/cycles";
 import { createExercise, listExercises } from "@/lib/db/queries/exercises";
 
@@ -23,18 +22,9 @@ const bodySchema = z.object({
   note: z.string().trim().max(200).optional(),
 });
 
-async function session() {
-  return auth.api.getSession({ headers: await headers() }).catch(() => null);
-}
-
 export async function GET(req: NextRequest) {
-  const s = await session();
-  if (!s) {
-    return NextResponse.json(
-      { success: false, error: { code: "UNAUTHORIZED", message: "请先登录" } },
-      { status: 401 },
-    );
-  }
+  const { userId, error } = await requireUserId();
+  if (error) return error;
 
   const sp = req.nextUrl.searchParams;
   const parsed = querySchema.safeParse({
@@ -48,7 +38,7 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const exercises = await listExercises(s.user.id, {
+  const exercises = await listExercises(userId, {
     search: parsed.data.search || undefined,
     muscleGroup: parsed.data.muscle,
   });
@@ -56,13 +46,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const s = await session();
-  if (!s) {
-    return NextResponse.json(
-      { success: false, error: { code: "UNAUTHORIZED", message: "请先登录" } },
-      { status: 401 },
-    );
-  }
+  const { userId, error } = await requireUserId();
+  if (error) return error;
 
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
@@ -73,7 +58,7 @@ export async function POST(req: NextRequest) {
   }
 
   const exercise = await createExercise({
-    userId: s.user.id,
+    userId,
     name: parsed.data.name,
     muscleGroup: parsed.data.muscleGroup,
     note: parsed.data.note,

@@ -4,11 +4,10 @@
  * 一天多训练追加制(重复添加为追加,不提示覆盖);body 带 cycleId 定位周期
  * (未开始周期可与进行中周期日期重叠,无法仅凭 date 反查)。
  */
-import { headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
-import { auth } from "@/lib/auth";
+import { requireUserId } from "@/lib/api/auth";
 import { dayError } from "@/lib/api-days";
 import { MUSCLE_GROUPS } from "@/lib/cycles";
 import { addTrainingToDay } from "@/lib/db/queries/training-days";
@@ -28,15 +27,8 @@ const bodySchema = z.object({
 type Ctx = { params: Promise<{ date: string }> };
 
 export async function POST(req: NextRequest, ctx: Ctx) {
-  const session = await auth.api
-    .getSession({ headers: await headers() })
-    .catch(() => null);
-  if (!session) {
-    return NextResponse.json(
-      { success: false, error: { code: "UNAUTHORIZED", message: "请先登录" } },
-      { status: 401 },
-    );
-  }
+  const { userId, error } = await requireUserId();
+  if (error) return error;
 
   const { date } = await ctx.params;
   if (!z.string().regex(DATE_RE).safeParse(date).success) {
@@ -55,7 +47,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
   }
 
   const result = await addTrainingToDay({
-    userId: session.user.id,
+    userId,
     cycleId: parsed.data.cycleId,
     date,
     name: parsed.data.name,

@@ -4,11 +4,10 @@
  * 已有进行中周期 → 409 返回其名称,前端弹"结束并激活新周期?"确认后带 force 重发;
  * 已结束周期不可复活(生命周期终点)。
  */
-import { headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
-import { auth } from "@/lib/auth";
+import { requireUserId } from "@/lib/api/auth";
 import { activateCycle } from "@/lib/db/queries/cycles";
 
 const bodySchema = z.object({
@@ -18,15 +17,8 @@ const bodySchema = z.object({
 type Ctx = { params: Promise<{ id: string }> };
 
 export async function POST(req: NextRequest, ctx: Ctx) {
-  const session = await auth.api
-    .getSession({ headers: await headers() })
-    .catch(() => null);
-  if (!session) {
-    return NextResponse.json(
-      { success: false, error: { code: "UNAUTHORIZED", message: "请先登录" } },
-      { status: 401 },
-    );
-  }
+  const { userId, error } = await requireUserId();
+  if (error) return error;
 
   const { id } = await ctx.params;
   if (!z.string().uuid().safeParse(id).success) {
@@ -45,7 +37,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
   }
 
   const result = await activateCycle({
-    userId: session.user.id,
+    userId,
     id,
     force: parsed.data.force,
   });

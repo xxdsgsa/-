@@ -4,11 +4,10 @@
  * 仅未来日期可改删(历史只读);删除不影响训练历史(3.1.11),
  * 已有执行记录的训练拒绝删除(409)。
  */
-import { headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
-import { auth } from "@/lib/auth";
+import { requireUserId } from "@/lib/api/auth";
 import { dayError } from "@/lib/api-days";
 import { MUSCLE_GROUPS } from "@/lib/cycles";
 import { deleteTraining, updateTraining } from "@/lib/db/queries/training-days";
@@ -28,15 +27,8 @@ const patchSchema = z.object({
 type Ctx = { params: Promise<{ id: string }> };
 
 export async function PATCH(req: NextRequest, ctx: Ctx) {
-  const session = await auth.api
-    .getSession({ headers: await headers() })
-    .catch(() => null);
-  if (!session) {
-    return NextResponse.json(
-      { success: false, error: { code: "UNAUTHORIZED", message: "请先登录" } },
-      { status: 401 },
-    );
-  }
+  const { userId, error } = await requireUserId();
+  if (error) return error;
 
   const { id } = await ctx.params;
   if (!z.string().uuid().safeParse(id).success) {
@@ -55,7 +47,7 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
   }
 
   const result = await updateTraining({
-    userId: session.user.id,
+    userId,
     trainingId: id,
     name: parsed.data.name,
     muscleGroups: parsed.data.muscleGroups,
@@ -69,15 +61,8 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
 }
 
 export async function DELETE(req: NextRequest, ctx: Ctx) {
-  const session = await auth.api
-    .getSession({ headers: await headers() })
-    .catch(() => null);
-  if (!session) {
-    return NextResponse.json(
-      { success: false, error: { code: "UNAUTHORIZED", message: "请先登录" } },
-      { status: 401 },
-    );
-  }
+  const { userId, error } = await requireUserId();
+  if (error) return error;
 
   const { id } = await ctx.params;
   if (!z.string().uuid().safeParse(id).success) {
@@ -96,7 +81,7 @@ export async function DELETE(req: NextRequest, ctx: Ctx) {
     );
   }
 
-  const result = await deleteTraining({ userId: session.user.id, trainingId: id, today });
+  const result = await deleteTraining({ userId, trainingId: id, today });
   if (!result.ok) {
     return dayError(result.reason);
   }

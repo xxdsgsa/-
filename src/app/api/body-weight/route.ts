@@ -3,11 +3,10 @@
  * body: { weightKg: 20~300(1 位小数), overwrite? }。
  * 同日已有记录且未确认覆盖 → 409 ALREADY_EXISTS(客户端二次确认后重发)。
  */
-import { headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
-import { auth } from "@/lib/auth";
+import { requireUserId } from "@/lib/api/auth";
 import { serverToday } from "@/lib/date";
 import {
   getBodyWeightForDate,
@@ -24,15 +23,8 @@ const bodySchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const session = await auth.api
-    .getSession({ headers: await headers() })
-    .catch(() => null);
-  if (!session) {
-    return NextResponse.json(
-      { success: false, error: { code: "UNAUTHORIZED", message: "请先登录" } },
-      { status: 401 },
-    );
-  }
+  const { userId, error } = await requireUserId();
+  if (error) return error;
 
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
@@ -45,7 +37,7 @@ export async function POST(req: NextRequest) {
   const { weightKg, overwrite } = parsed.data;
   const today = serverToday();
 
-  const existing = await getBodyWeightForDate(session.user.id, today);
+  const existing = await getBodyWeightForDate(userId, today);
   if (existing && !overwrite) {
     return NextResponse.json(
       { success: false, error: { code: "ALREADY_EXISTS", message: "今天已经记录过体重,是否覆盖?" } },
@@ -54,7 +46,7 @@ export async function POST(req: NextRequest) {
   }
 
   const record = await upsertBodyWeight({
-    userId: session.user.id,
+    userId,
     date: today,
     weightKg: String(weightKg),
   });

@@ -4,11 +4,10 @@
  * 服务端权威:营养目标服务端计算,仅手动项用客户端值;
  * 必填字段/范围全量 Zod 校验(表单校验防不住直调)。
  */
-import { headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
-import { auth } from "@/lib/auth";
+import { requireUserId } from "@/lib/api/auth";
 import { completeOnboarding } from "@/lib/db/queries/onboarding";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -37,15 +36,8 @@ const bodySchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const session = await auth.api
-    .getSession({ headers: await headers() })
-    .catch(() => null);
-  if (!session) {
-    return NextResponse.json(
-      { success: false, error: { code: "UNAUTHORIZED", message: "请先登录" } },
-      { status: 401 },
-    );
-  }
+  const { userId, error } = await requireUserId();
+  if (error) return error;
 
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
@@ -66,7 +58,7 @@ export async function POST(req: NextRequest) {
   }
 
   const goals = await completeOnboarding({
-    userId: session.user.id,
+    userId,
     ...parsed.data,
     heightCm: parsed.data.heightCm ?? null,
     bodyFatPct: parsed.data.bodyFatPct ?? null,

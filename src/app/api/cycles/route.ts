@@ -4,11 +4,10 @@
  * 校验:endDate > startDate;startDate ≤ 今日时新周期即为"进行中",
  * 若已有进行中周期 → 409 返回其名称,前端弹"结束并激活新周期?"确认后带 force 重发。
  */
-import { headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
-import { auth } from "@/lib/auth";
+import { requireUserId } from "@/lib/api/auth";
 import { createCycle } from "@/lib/db/queries/cycles";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -22,15 +21,8 @@ const bodySchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const session = await auth.api
-    .getSession({ headers: await headers() })
-    .catch(() => null);
-  if (!session) {
-    return NextResponse.json(
-      { success: false, error: { code: "UNAUTHORIZED", message: "请先登录" } },
-      { status: 401 },
-    );
-  }
+  const { userId, error } = await requireUserId();
+  if (error) return error;
 
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
@@ -49,7 +41,7 @@ export async function POST(req: NextRequest) {
   }
 
   const result = await createCycle({
-    userId: session.user.id,
+    userId,
     name,
     startDate,
     endDate,

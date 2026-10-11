@@ -3,11 +3,10 @@
  *
  * body: { direction: "up" | "down" };V1 以按钮代长按拖拽,顶端/底端幂等成功。
  */
-import { headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
-import { auth } from "@/lib/auth";
+import { requireUserId } from "@/lib/api/auth";
 import { dayError } from "@/lib/api-days";
 import { moveTrainingItem } from "@/lib/db/queries/training-items";
 
@@ -21,15 +20,8 @@ const bodySchema = z.object({
 type Ctx = { params: Promise<{ id: string }> };
 
 export async function POST(req: NextRequest, ctx: Ctx) {
-  const session = await auth.api
-    .getSession({ headers: await headers() })
-    .catch(() => null);
-  if (!session) {
-    return NextResponse.json(
-      { success: false, error: { code: "UNAUTHORIZED", message: "请先登录" } },
-      { status: 401 },
-    );
-  }
+  const { userId, error } = await requireUserId();
+  if (error) return error;
 
   const { id } = await ctx.params;
   if (!z.string().uuid().safeParse(id).success) {
@@ -48,7 +40,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
   }
 
   const result = await moveTrainingItem({
-    userId: session.user.id,
+    userId,
     itemId: id,
     direction: parsed.data.direction,
     today: parsed.data.today,

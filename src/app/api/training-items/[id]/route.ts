@@ -4,11 +4,10 @@
  * PATCH   编辑动作参数(组数/次数/目标重量/休息时间/备注;null 表示清空可选字段)
  * DELETE  删除动作(已被逐组记录引用时 409,历史保留)
  */
-import { headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
-import { auth } from "@/lib/auth";
+import { requireUserId } from "@/lib/api/auth";
 import { dayError } from "@/lib/api-days";
 import { deleteTrainingItem, updateTrainingItem } from "@/lib/db/queries/training-items";
 
@@ -26,22 +25,13 @@ const bodySchema = z.object({
 
 type Ctx = { params: Promise<{ id: string }> };
 
-async function session() {
-  return auth.api.getSession({ headers: await headers() }).catch(() => null);
-}
-
 function badId(id: string) {
   return !z.string().uuid().safeParse(id).success;
 }
 
 export async function PATCH(req: NextRequest, ctx: Ctx) {
-  const s = await session();
-  if (!s) {
-    return NextResponse.json(
-      { success: false, error: { code: "UNAUTHORIZED", message: "请先登录" } },
-      { status: 401 },
-    );
-  }
+  const { userId, error } = await requireUserId();
+  if (error) return error;
 
   const { id } = await ctx.params;
   if (badId(id)) {
@@ -60,7 +50,7 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
   }
 
   const result = await updateTrainingItem({
-    userId: s.user.id,
+    userId,
     itemId: id,
     body: {
       ...(parsed.data.sets !== undefined ? { sets: parsed.data.sets } : {}),
@@ -77,13 +67,8 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
 }
 
 export async function DELETE(req: NextRequest, ctx: Ctx) {
-  const s = await session();
-  if (!s) {
-    return NextResponse.json(
-      { success: false, error: { code: "UNAUTHORIZED", message: "请先登录" } },
-      { status: 401 },
-    );
-  }
+  const { userId, error } = await requireUserId();
+  if (error) return error;
 
   const { id } = await ctx.params;
   if (badId(id)) {
@@ -94,7 +79,7 @@ export async function DELETE(req: NextRequest, ctx: Ctx) {
   }
 
   const today = req.nextUrl.searchParams.get("today") ?? undefined;
-  const result = await deleteTrainingItem({ userId: s.user.id, itemId: id, today });
+  const result = await deleteTrainingItem({ userId, itemId: id, today });
   if (!result.ok) return dayError(result.reason);
 
   return NextResponse.json({ success: true, data: null });

@@ -3,12 +3,13 @@
  *
  * 日期编辑成对提交(表单始终 name+两日期齐发,仅改名时无日期);
  * 删除为软删:计划数据隐藏,训练历史完整保留。
+ *
+ * 鉴权:requireUserId() helper 取代 27 处样板(Batch 3 refactor)。
  */
-import { headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
-import { auth } from "@/lib/auth";
+import { requireUserId } from "@/lib/api/auth";
 import { deleteCycle, updateCycle } from "@/lib/db/queries/cycles";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -30,15 +31,8 @@ const patchSchema = z
 type Ctx = { params: Promise<{ id: string }> };
 
 export async function PATCH(req: NextRequest, ctx: Ctx) {
-  const session = await auth.api
-    .getSession({ headers: await headers() })
-    .catch(() => null);
-  if (!session) {
-    return NextResponse.json(
-      { success: false, error: { code: "UNAUTHORIZED", message: "请先登录" } },
-      { status: 401 },
-    );
-  }
+  const { userId, error } = await requireUserId();
+  if (error) return error;
 
   const { id } = await ctx.params;
   if (!z.string().uuid().safeParse(id).success) {
@@ -65,7 +59,7 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
   }
 
   const result = await updateCycle({
-    userId: session.user.id,
+    userId,
     id,
     name,
     startDate,
@@ -96,15 +90,8 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
 }
 
 export async function DELETE(_req: NextRequest, ctx: Ctx) {
-  const session = await auth.api
-    .getSession({ headers: await headers() })
-    .catch(() => null);
-  if (!session) {
-    return NextResponse.json(
-      { success: false, error: { code: "UNAUTHORIZED", message: "请先登录" } },
-      { status: 401 },
-    );
-  }
+  const { userId, error } = await requireUserId();
+  if (error) return error;
 
   const { id } = await ctx.params;
   if (!z.string().uuid().safeParse(id).success) {
@@ -114,7 +101,7 @@ export async function DELETE(_req: NextRequest, ctx: Ctx) {
     );
   }
 
-  const deleted = await deleteCycle(session.user.id, id);
+  const deleted = await deleteCycle(userId, id);
   if (!deleted) {
     return NextResponse.json(
       { success: false, error: { code: "NOT_FOUND", message: "周期不存在" } },

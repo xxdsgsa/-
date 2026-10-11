@@ -3,11 +3,10 @@
  * PATCH  编辑我的食物(官方 403,他人 404)
  * DELETE 软删我的食物;历史记录走条目快照不受影响
  */
-import { headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
-import { auth } from "@/lib/auth";
+import { requireUserId } from "@/lib/api/auth";
 import { dietError } from "@/lib/api-diet";
 import { deleteFood, updateFood } from "@/lib/db/queries/diet";
 
@@ -28,18 +27,9 @@ const bodySchema = z.object({
   isLiquid: z.boolean().optional(),
 });
 
-async function session() {
-  return auth.api.getSession({ headers: await headers() }).catch(() => null);
-}
-
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const s = await session();
-  if (!s) {
-    return NextResponse.json(
-      { success: false, error: { code: "UNAUTHORIZED", message: "请先登录" } },
-      { status: 401 },
-    );
-  }
+  const { userId, error } = await requireUserId();
+  if (error) return error;
   const { id } = await params;
   if (!UUID_RE.test(id)) {
     return NextResponse.json(
@@ -56,19 +46,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     );
   }
 
-  const r = await updateFood(s.user.id, id, parsed.data);
+  const r = await updateFood(userId, id, parsed.data);
   if (!r.ok) return dietError(r.reason);
   return NextResponse.json({ success: true, data: null });
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const s = await session();
-  if (!s) {
-    return NextResponse.json(
-      { success: false, error: { code: "UNAUTHORIZED", message: "请先登录" } },
-      { status: 401 },
-    );
-  }
+  const { userId, error } = await requireUserId();
+  if (error) return error;
   const { id } = await params;
   if (!UUID_RE.test(id)) {
     return NextResponse.json(
@@ -77,7 +62,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
     );
   }
 
-  const r = await deleteFood(s.user.id, id);
+  const r = await deleteFood(userId, id);
   if (!r.ok) return dietError(r.reason);
   return NextResponse.json({ success: true, data: null });
 }

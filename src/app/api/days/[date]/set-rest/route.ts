@@ -4,11 +4,10 @@
  * 仅未来(含今天)可切换;设休息日时已有计划训练一并移除(历史记录不受影响),
  * 二次确认由前端承担。
  */
-import { headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
-import { auth } from "@/lib/auth";
+import { requireUserId } from "@/lib/api/auth";
 import { dayError } from "@/lib/api-days";
 import { setDayRest } from "@/lib/db/queries/training-days";
 
@@ -23,15 +22,8 @@ const bodySchema = z.object({
 type Ctx = { params: Promise<{ date: string }> };
 
 export async function POST(req: NextRequest, ctx: Ctx) {
-  const session = await auth.api
-    .getSession({ headers: await headers() })
-    .catch(() => null);
-  if (!session) {
-    return NextResponse.json(
-      { success: false, error: { code: "UNAUTHORIZED", message: "请先登录" } },
-      { status: 401 },
-    );
-  }
+  const { userId, error } = await requireUserId();
+  if (error) return error;
 
   const { date } = await ctx.params;
   if (!z.string().regex(DATE_RE).safeParse(date).success) {
@@ -50,7 +42,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
   }
 
   const result = await setDayRest({
-    userId: session.user.id,
+    userId,
     cycleId: parsed.data.cycleId,
     date,
     isRest: parsed.data.isRest,

@@ -4,11 +4,10 @@
  * body: { trainingItemId, setIndex(1-based), weight?, reps? };实际值由前端默认带入计划值。
  * 重复提交幂等覆盖;session 已结束 → 400 NOT_IN_PROGRESS。
  */
-import { headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
-import { auth } from "@/lib/auth";
+import { requireUserId } from "@/lib/api/auth";
 import { dayError } from "@/lib/api-days";
 import { logSet } from "@/lib/db/queries/training-sessions";
 
@@ -24,15 +23,8 @@ const bodySchema = z.object({
 type Ctx = { params: Promise<{ id: string }> };
 
 export async function POST(req: NextRequest, ctx: Ctx) {
-  const session = await auth.api
-    .getSession({ headers: await headers() })
-    .catch(() => null);
-  if (!session) {
-    return NextResponse.json(
-      { success: false, error: { code: "UNAUTHORIZED", message: "请先登录" } },
-      { status: 401 },
-    );
-  }
+  const { userId, error } = await requireUserId();
+  if (error) return error;
 
   const { id } = await ctx.params;
   if (!z.string().uuid().safeParse(id).success) {
@@ -51,7 +43,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
   }
 
   const result = await logSet({
-    userId: session.user.id,
+    userId,
     sessionId: id,
     trainingItemId: parsed.data.trainingItemId,
     setIndex: parsed.data.setIndex,
