@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { requireUserId } from "@/lib/api/auth";
-import { dayError } from "@/lib/api-days";
+import { dayError } from "@/lib/api/days";
 import { parseJsonBody } from "@/lib/api/parse";
 import { logSet } from "@/lib/db/queries/training-sessions";
 

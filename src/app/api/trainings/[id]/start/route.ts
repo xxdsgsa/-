@@ -9,7 +9,7 @@ import { z } from "zod";
 
 import { requireUserId } from "@/lib/api/auth";
 import { DATE_RE } from "@/lib/api/params";
-import { dayError } from "@/lib/api-days";
+import { dayError } from "@/lib/api/days";
 import { startSession } from "@/lib/db/queries/training-sessions";
 
 const bodySchema = z.object({

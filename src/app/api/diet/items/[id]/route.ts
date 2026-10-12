@@ -8,7 +8,7 @@ import { z } from "zod";
 
 import { requireUserId } from "@/lib/api/auth";
 import { DATE_RE } from "@/lib/api/params";
-import { dietError } from "@/lib/api-diet";
+import { dietError } from "@/lib/api/diet";
 import { parseJsonBody } from "@/lib/api/parse";
 import { deleteDietItem, updateDietItem } from "@/lib/db/queries/diet";
 

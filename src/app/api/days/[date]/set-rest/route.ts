@@ -10,7 +10,7 @@ import { z } from "zod";
 import { requireUserId } from "@/lib/api/auth";
 import { DATE_RE, parseDateParam } from "@/lib/api/params";
 import { parseJsonBody } from "@/lib/api/parse";
-import { dayError } from "@/lib/api-days";
+import { dayError } from "@/lib/api/days";
 import { setDayRest } from "@/lib/db/queries/training-days";
 
 const bodySchema = z.object({

@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { requireUserId } from "@/lib/api/auth";
-import { dayError } from "@/lib/api-days";
+import { dayError } from "@/lib/api/days";
 import { finishSession } from "@/lib/db/queries/training-sessions";
 
 type Ctx = { params: Promise<{ id: string }> };

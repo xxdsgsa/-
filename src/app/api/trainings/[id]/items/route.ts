@@ -9,7 +9,7 @@ import { z } from "zod";
 
 import { requireUserId } from "@/lib/api/auth";
 import { DATE_RE } from "@/lib/api/params";
-import { dayError } from "@/lib/api-days";
+import { dayError } from "@/lib/api/days";
 import { parseJsonBody } from "@/lib/api/parse";
 import { addTrainingItem } from "@/lib/db/queries/training-items";
 const WEIGHT_RE = /^\d{1,4}(\.\d)?$/;

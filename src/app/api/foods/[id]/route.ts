@@ -7,7 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { requireUserId } from "@/lib/api/auth";
-import { dietError } from "@/lib/api-diet";
+import { dietError } from "@/lib/api/diet";
 import { parseJsonBody } from "@/lib/api/parse";
 import { deleteFood, updateFood } from "@/lib/db/queries/diet";
 
