@@ -10,6 +10,7 @@ import { headers } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { LineChart } from "@/components/line-chart";
 import { auth } from "@/lib/auth";
 import { formatDateLabel, serverToday } from "@/lib/date";
 import { getDashboardData } from "@/lib/db/queries/dashboard";
@@ -236,11 +237,21 @@ export default async function StatsPage({
         ) : (
           <p className="text-sm text-muted-foreground">暂无体重记录</p>
         )}
-        {/* 折线图占位: V1.1 接入(3.11.10 评审 2) */}
+        {/* 折线图(3.11.10 评审 2 P2 提前做):体重 30 天趋势 */}
         {weightTrend.points.length > 1 && (
-          <p className="mt-1 text-xs text-muted-foreground">
-            {weightTrend.points.length} 个数据点 · 详细图表 V1.1 接入
-          </p>
+          <div className="mt-2">
+            <LineChart
+              series={[
+                {
+                  name: "体重",
+                  points: weightTrend.points.map((p) => ({ date: p.date, value: p.weightKg })),
+                  color: "#10b981",
+                  unit: "kg",
+                },
+              ]}
+              yPrecision={1}
+            />
+          </div>
         )}
       </div>
 
