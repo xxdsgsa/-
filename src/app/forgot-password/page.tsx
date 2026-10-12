@@ -14,9 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authClient } from "@/lib/auth-client";
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const PASSWORD_RE = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/;
+import { EMAIL_RE, OTP_RE, PASSWORD_RE } from "@/lib/validators";
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
@@ -60,7 +58,7 @@ export default function ForgotPasswordPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!EMAIL_RE.test(email)) return toast.error("请输入正确的邮箱地址");
-    if (!/^\d{6}$/.test(otp)) return toast.error("请输入 6 位数字验证码");
+    if (!OTP_RE.test(otp)) return toast.error("请输入 6 位数字验证码");
     if (!PASSWORD_RE.test(password))
       return toast.error("密码需至少 8 位,且包含字母和数字");
     if (password !== confirmPassword) return toast.error("两次输入的密码不一致");
