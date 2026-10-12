@@ -11,6 +11,7 @@
  */
 import { and, asc, desc, eq, gte, lte, sql } from "drizzle-orm";
 
+import { addDays, dateRange, parseYmd } from "@/lib/date-math";
 import { serverToday } from "@/lib/date";
 
 import { db } from "@/db";
@@ -27,21 +28,6 @@ import {
 /* ============================================================
  * 范围工具
  * ============================================================ */
-
-/** "YYYY-MM-DD" 字符串 → UTC Date(用于 day-of-week 计算,无时区语义) */
-function parseYmd(s: string): Date {
-  const [y, m, d] = s.split("-").map(Number);
-  return new Date(Date.UTC(y, m - 1, d));
-}
-
-/** "YYYY-MM-DD" 字符串 + 偏移 n 天(与 addDaysStr 同语义) */
-function addDays(dateStr: string, n: number): string {
-  const d = parseYmd(dateStr);
-  d.setUTCDate(d.getUTCDate() + n);
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(
-    d.getUTCDate(),
-  ).padStart(2, "0")}`;
-}
 
 /** 本周一起点(周一=1, ISO 周首;3.11.4 边界规则) */
 function weekStart(today: string): string {
@@ -139,17 +125,6 @@ async function assessDays(userId: string, dates: string[]): Promise<Map<string, 
     // else 保持 no_plan
   }
   return map;
-}
-
-/** 范围日序列(闭区间两端,字符串序) */
-function dateRange(start: string, end: string): string[] {
-  const out: string[] = [];
-  let cur = start;
-  while (cur <= end) {
-    out.push(cur);
-    cur = addDays(cur, 1);
-  }
-  return out;
 }
 
 /* ============================================================

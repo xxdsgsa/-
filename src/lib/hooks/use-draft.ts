@@ -31,7 +31,7 @@ function isExpired(env: DraftEnvelope<unknown>): boolean {
   return Date.now() - new Date(env.savedAt).getTime() > TTL_MS;
 }
 
-/** 读草稿(浏览器侧);过期或解析失败返回 null */
+/** 读草稿(浏览器侧);过期或解析失败返回 null,并清掉坏数据 */
 export function loadDraft<T>(key: string): T | null {
   if (typeof window === "undefined") return null;
   try {
@@ -44,6 +44,12 @@ export function loadDraft<T>(key: string): T | null {
     }
     return env.data;
   } catch {
+    // 解析失败也清掉,避免坏数据反复阻塞
+    try {
+      window.localStorage.removeItem(key);
+    } catch {
+      // 静默
+    }
     return null;
   }
 }
