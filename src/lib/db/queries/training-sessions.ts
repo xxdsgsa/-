@@ -16,6 +16,7 @@ import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { trackRecord } from "@/lib/analytics";
 import { weekdayCN } from "@/lib/cycles";
 import { serverToday } from "@/lib/date";
+import { calcVolumeFromLogs } from "@/lib/summary-calc";
 
 import { db } from "@/db";
 import { exercises, setLogs, trainingItems, trainingSessions, trainings } from "@/db/schema";
@@ -250,22 +251,41 @@ export async function getSessionSummary(
       .select({
         trainingItemId: setLogs.trainingItemId,
         completedSets: sql<number>`cast(count(*) filter (where ${setLogs.completed}) as int)`,
-        volume: sql<number>`cast(coalesce(sum(${setLogs.actualWeight} * ${setLogs.actualReps}) filter (where ${setLogs.completed} and ${setLogs.actualWeight} is not null), 0) as double precision)`,
+        actualWeight: setLogs.actualWeight,
+        actualReps: setLogs.actualReps,
+        completed: setLogs.completed,
       })
       .from(setLogs)
-      .where(eq(setLogs.sessionId, sessionId))
-      .groupBy(setLogs.trainingItemId),
+      .where(eq(setLogs.sessionId, sessionId)),
   ]);
 
-  const logMap = new Map(logs.map((l) => [l.trainingItemId, l]));
-  const itemViews = items.map((it) => ({
-    itemId: it.itemId,
-    name: it.name,
-    plannedSets: it.plannedSets,
-    reps: it.reps,
-    completedSets: logMap.get(it.itemId)?.completedSets ?? 0,
-  }));
-  const totalVolume = logs.reduce((sum, l) => sum + l.volume, 0);
+  // 按 item 聚合(纯函数路径;drizzle numeric 模式 = string,需转 number)
+  const byItem = new Map<string, { completedSets: number; logs: { actualWeight: number | null; actualReps: number; completed: boolean }[] }>();
+  for (const l of logs) {
+    const entry = byItem.get(l.trainingItemId) ?? { completedSets: 0, logs: [] };
+    if (l.completed) entry.completedSets += 1;
+    entry.logs.push({
+      actualWeight: l.actualWeight != null ? Number(l.actualWeight) : null,
+      actualReps: Number(l.actualReps),
+      completed: l.completed ?? false,
+    });
+    byItem.set(l.trainingItemId, entry);
+  }
+
+  const itemViews = items.map((it) => {
+    const entry = byItem.get(it.itemId);
+    return {
+      itemId: it.itemId,
+      name: it.name,
+      plannedSets: it.plannedSets,
+      reps: it.reps,
+      completedSets: entry?.completedSets ?? 0,
+    };
+  });
+
+  // 容量(纯函数聚合)
+  const allLogs = Array.from(byItem.values()).flatMap((e) => e.logs);
+  const totalVolume = calcVolumeFromLogs(allLogs);
 
   const [, m, d] = row.date.split("-");
   return {
