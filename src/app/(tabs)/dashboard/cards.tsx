@@ -322,6 +322,10 @@ export function WaterCard({ water }: { water: DashboardData["water"] }) {
     setTotal(water.currentMl);
   }
 
+  const [customOpen, setCustomOpen] = useState(false);
+  const [customMl, setCustomMl] = useState("");
+  const [saving, setSaving] = useState(false);
+
   const p = pct(total, water.goalMl);
   const over = p != null && p > 100;
   const empty = total === 0;
@@ -342,34 +346,91 @@ export function WaterCard({ water }: { water: DashboardData["water"] }) {
     }
   }
 
+  async function submitCustom() {
+    const n = Number(customMl);
+    if (!Number.isInteger(n) || n < 1 || n > 2000) {
+      toast.error("请输入 1~2000 之间的数值");
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await fetch("/api/water-logs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amountMl: n }),
+      });
+      if (!res.ok) throw new Error();
+      setCustomOpen(false);
+      setCustomMl("");
+      router.refresh();
+    } catch {
+      toast.error("记录失败,请重试");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
-    <Card>
-      <CardContent className="flex items-center gap-3">
-        <WaterRing current={total} goal={water.goalMl} />
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <p className="text-sm font-semibold tabular-nums">
-            {total} / {water.goalMl ?? "--"} ml
-          </p>
-          {over ? (
-            <p className={cn("text-xs", OVER_TEXT)}>已超过今日饮水目标</p>
-          ) : empty ? (
-            <p className="text-xs text-muted-foreground">今天还没有记录饮水</p>
-          ) : (
-            <p className="text-xs text-muted-foreground">
-              <Droplets className="mr-0.5 inline size-3" aria-hidden="true" />
-              距目标还差 {Math.max(0, (water.goalMl ?? 0) - total)} ml
+    <>
+      <Card>
+        <CardContent className="flex items-center gap-3">
+          <WaterRing current={total} goal={water.goalMl} />
+          <div className="flex min-w-0 flex-1 flex-col gap-1">
+            <p className="text-sm font-semibold tabular-nums">
+              {total} / {water.goalMl ?? "--"} ml
             </p>
-          )}
-          <div className="mt-1.5 flex gap-2">
-            {[100, 250, 500].map((ml) => (
-              <Button key={ml} variant="outline" size="sm" onClick={() => void add(ml)}>
-                +{ml}
+            {over ? (
+              <p className={cn("text-xs", OVER_TEXT)}>已超过今日饮水目标</p>
+            ) : empty ? (
+              <p className="text-xs text-muted-foreground">今天还没有记录饮水</p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                <Droplets className="mr-0.5 inline size-3" aria-hidden="true" />
+                距目标还差 {Math.max(0, (water.goalMl ?? 0) - total)} ml
+              </p>
+            )}
+            <div className="mt-1.5 flex gap-2">
+              {[100, 250, 500].map((ml) => (
+                <Button key={ml} variant="outline" size="sm" onClick={() => void add(ml)}>
+                  +{ml}
+                </Button>
+              ))}
+              <Button variant="ghost" size="sm" onClick={() => setCustomOpen(true)}>
+                自定义
               </Button>
-            ))}
+            </div>
           </div>
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+
+      {/* 自定义饮水量 Sheet(3.10.2) */}
+      <Sheet open={customOpen} onOpenChange={(o) => !o && setCustomOpen(false)}>
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle>记录饮水量</SheetTitle>
+            <SheetDescription>请输入 1~2000 ml</SheetDescription>
+          </SheetHeader>
+          <div className="mt-4 space-y-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="water-custom">饮水量(ml)</Label>
+              <Input
+                id="water-custom"
+                inputMode="numeric"
+                value={customMl}
+                placeholder="请输入"
+                onChange={(e) => setCustomMl(e.target.value)}
+              />
+            </div>
+            <Button className="w-full" disabled={saving} onClick={() => void submitCustom()}>
+              {saving ? "保存中…" : "记录"}
+            </Button>
+            <Button variant="outline" className="w-full" asChild>
+              <Link href="/water">查看今日记录</Link>
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
+    </>
   );
 }
 
