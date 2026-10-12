@@ -10,6 +10,15 @@ export function serverToday(): string {
   return new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(0, 10);
 }
 
+/**
+ * 服务端"昨日"(UTC+8 宽松口径):YYYY-MM-DD
+ * 实现:T 减 16h(等价于"今日"起点 16h UTC 再减 24h),跨日边界安全。
+ * 错误实现示例 `T + 7h` 在 UTC+8 1:00~8:00 会返回"今日"而非"昨日",勿用。
+ */
+export function serverYesterday(): string {
+  return new Date(Date.now() - 16 * 3600 * 1000).toISOString().slice(0, 10);
+}
+
 /** UTC+8 当前小时(0~23,首页问候语用) */
 export function serverHour(): number {
   return new Date(Date.now() + 8 * 3600 * 1000).getUTCHours();

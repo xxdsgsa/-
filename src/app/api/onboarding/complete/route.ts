@@ -8,6 +8,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { requireUserId } from "@/lib/api/auth";
+import { parseJsonBody } from "@/lib/api/parse";
+import { serverToday, serverYesterday } from "@/lib/date";
 import { completeOnboarding } from "@/lib/db/queries/onboarding";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -39,18 +41,11 @@ export async function POST(req: NextRequest) {
   const { userId, error } = await requireUserId();
   if (error) return error;
 
-  const parsed = bodySchema.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) {
-    return NextResponse.json(
-      { success: false, error: { code: "VALIDATION_ERROR", message: "表单数据不合法" } },
-      { status: 400 },
-    );
-  }
+  const { data, error: parseError } = await parseJsonBody(req, bodySchema);
+  if (parseError) return parseError;
 
   // 仅当日校验(UTC+8 宽松:不为未来、不早于昨日)
-  const todayServer = new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(0, 10);
-  const yesterday = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
-  if (parsed.data.today > todayServer || parsed.data.today < yesterday) {
+  if (data.today > serverToday() || data.today < serverYesterday()) {
     return NextResponse.json(
       { success: false, error: { code: "VALIDATION_ERROR", message: "日期超出当日范围" } },
       { status: 400 },
@@ -59,11 +54,11 @@ export async function POST(req: NextRequest) {
 
   const goals = await completeOnboarding({
     userId,
-    ...parsed.data,
-    heightCm: parsed.data.heightCm ?? null,
-    bodyFatPct: parsed.data.bodyFatPct ?? null,
-    targetWeightKg: parsed.data.targetWeightKg ?? null,
-    targetDate: parsed.data.targetDate ?? null,
+    ...data,
+    heightCm: data.heightCm ?? null,
+    bodyFatPct: data.bodyFatPct ?? null,
+    targetWeightKg: data.targetWeightKg ?? null,
+    targetDate: data.targetDate ?? null,
   });
 
   return NextResponse.json({ success: true, data: { goals } });
