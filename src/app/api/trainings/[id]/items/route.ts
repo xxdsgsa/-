@@ -9,6 +9,7 @@ import { z } from "zod";
 
 import { requireUserId } from "@/lib/api/auth";
 import { dayError } from "@/lib/api-days";
+import { parseJsonBody } from "@/lib/api/parse";
 import { addTrainingItem } from "@/lib/db/queries/training-items";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -38,26 +39,21 @@ export async function POST(req: NextRequest, ctx: Ctx) {
     );
   }
 
-  const parsed = itemBodySchema.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) {
-    return NextResponse.json(
-      { success: false, error: { code: "VALIDATION_ERROR", message: "表单数据不合法" } },
-      { status: 400 },
-    );
-  }
+  const { data, error: parseError } = await parseJsonBody(req, itemBodySchema);
+  if (parseError) return parseError;
 
   const result = await addTrainingItem({
     userId,
     trainingId: id,
-    exerciseId: parsed.data.exerciseId,
+    exerciseId: data.exerciseId,
     body: {
-      sets: parsed.data.sets,
-      reps: parsed.data.reps,
-      targetWeight: parsed.data.targetWeight ?? null,
-      restSeconds: parsed.data.restSeconds ?? 90,
-      note: parsed.data.note ?? null,
+      sets: data.sets,
+      reps: data.reps,
+      targetWeight: data.targetWeight ?? null,
+      restSeconds: data.restSeconds ?? 90,
+      note: data.note ?? null,
     },
-    today: parsed.data.today,
+    today: data.today,
   });
   if (!result.ok) return dayError(result.reason);
 

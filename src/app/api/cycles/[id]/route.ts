@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { requireUserId } from "@/lib/api/auth";
+import { parseJsonBody } from "@/lib/api/parse";
 import { deleteCycle, updateCycle } from "@/lib/db/queries/cycles";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -42,15 +43,10 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
     );
   }
 
-  const parsed = patchSchema.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) {
-    return NextResponse.json(
-      { success: false, error: { code: "VALIDATION_ERROR", message: "表单数据不合法" } },
-      { status: 400 },
-    );
-  }
+  const { data, error: parseError } = await parseJsonBody(req, patchSchema);
+  if (parseError) return parseError;
 
-  const { name, startDate, endDate, today } = parsed.data;
+  const { name, startDate, endDate, today } = data;
   if (startDate !== undefined && endDate !== undefined && endDate <= startDate) {
     return NextResponse.json(
       { success: false, error: { code: "VALIDATION_ERROR", message: "结束日期必须晚于开始日期" } },

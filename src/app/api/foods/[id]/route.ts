@@ -8,6 +8,7 @@ import { z } from "zod";
 
 import { requireUserId } from "@/lib/api/auth";
 import { dietError } from "@/lib/api-diet";
+import { parseJsonBody } from "@/lib/api/parse";
 import { deleteFood, updateFood } from "@/lib/db/queries/diet";
 
 const UUID_RE = /^[0-9a-f-]{36}$/;
@@ -38,15 +39,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     );
   }
 
-  const parsed = bodySchema.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) {
-    return NextResponse.json(
-      { success: false, error: { code: "VALIDATION_ERROR", message: "表单数据不合法" } },
-      { status: 400 },
-    );
-  }
+  const { data, error: parseError } = await parseJsonBody(req, bodySchema);
+  if (parseError) return parseError;
 
-  const r = await updateFood(userId, id, parsed.data);
+  const r = await updateFood(userId, id, data);
   if (!r.ok) return dietError(r.reason);
   return NextResponse.json({ success: true, data: null });
 }

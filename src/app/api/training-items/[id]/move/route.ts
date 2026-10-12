@@ -8,6 +8,7 @@ import { z } from "zod";
 
 import { requireUserId } from "@/lib/api/auth";
 import { dayError } from "@/lib/api-days";
+import { parseJsonBody } from "@/lib/api/parse";
 import { moveTrainingItem } from "@/lib/db/queries/training-items";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -31,19 +32,14 @@ export async function POST(req: NextRequest, ctx: Ctx) {
     );
   }
 
-  const parsed = bodySchema.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) {
-    return NextResponse.json(
-      { success: false, error: { code: "VALIDATION_ERROR", message: "表单数据不合法" } },
-      { status: 400 },
-    );
-  }
+  const { data, error: parseError } = await parseJsonBody(req, bodySchema);
+  if (parseError) return parseError;
 
   const result = await moveTrainingItem({
     userId,
     itemId: id,
-    direction: parsed.data.direction,
-    today: parsed.data.today,
+    direction: data.direction,
+    today: data.today,
   });
   if (!result.ok) return dayError(result.reason);
 

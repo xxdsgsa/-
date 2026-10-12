@@ -7,6 +7,7 @@ import { z } from "zod";
 
 import { requireUserId } from "@/lib/api/auth";
 import { dietError } from "@/lib/api-diet";
+import { parseJsonBody } from "@/lib/api/parse";
 import { addDietItem, MEAL_TYPES } from "@/lib/db/queries/diet";
 
 /** 重量(g/ml):1~5000,最多 1 位小数(3.8.3) */
@@ -28,21 +29,20 @@ export async function POST(req: NextRequest) {
   const { userId, error } = await requireUserId();
   if (error) return error;
 
-  const parsed = bodySchema.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) {
-    return NextResponse.json(
-      { success: false, error: { code: "VALIDATION_ERROR", message: "请输入 1~5000 之间的数值" } },
-      { status: 400 },
-    );
-  }
+  const { data, error: parseError } = await parseJsonBody(
+    req,
+    bodySchema,
+    "请输入 1~5000 之间的数值",
+  );
+  if (parseError) return parseError;
 
   const r = await addDietItem({
     userId,
-    date: parsed.data.date,
-    mealType: parsed.data.mealType,
-    foodId: parsed.data.foodId,
-    grams: parsed.data.grams,
-    today: parsed.data.today,
+    date: data.date,
+    mealType: data.mealType,
+    foodId: data.foodId,
+    grams: data.grams,
+    today: data.today,
   });
   if (!r.ok) return dietError(r.reason);
   return NextResponse.json(

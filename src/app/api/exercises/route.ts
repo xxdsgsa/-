@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { requireUserId } from "@/lib/api/auth";
+import { parseJsonBody } from "@/lib/api/parse";
 import { MUSCLE_GROUPS } from "@/lib/cycles";
 import { createExercise, listExercises } from "@/lib/db/queries/exercises";
 
@@ -49,19 +50,14 @@ export async function POST(req: NextRequest) {
   const { userId, error } = await requireUserId();
   if (error) return error;
 
-  const parsed = bodySchema.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) {
-    return NextResponse.json(
-      { success: false, error: { code: "VALIDATION_ERROR", message: "表单数据不合法" } },
-      { status: 400 },
-    );
-  }
+  const { data, error: parseError } = await parseJsonBody(req, bodySchema);
+  if (parseError) return parseError;
 
   const exercise = await createExercise({
     userId,
-    name: parsed.data.name,
-    muscleGroup: parsed.data.muscleGroup,
-    note: parsed.data.note,
+    name: data.name,
+    muscleGroup: data.muscleGroup,
+    note: data.note,
   });
   return NextResponse.json(
     {

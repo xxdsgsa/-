@@ -9,6 +9,7 @@ import { z } from "zod";
 
 import { requireUserId } from "@/lib/api/auth";
 import { dayError } from "@/lib/api-days";
+import { parseJsonBody } from "@/lib/api/parse";
 import { MUSCLE_GROUPS } from "@/lib/cycles";
 import { addTrainingToDay } from "@/lib/db/queries/training-days";
 
@@ -38,21 +39,16 @@ export async function POST(req: NextRequest, ctx: Ctx) {
     );
   }
 
-  const parsed = bodySchema.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) {
-    return NextResponse.json(
-      { success: false, error: { code: "VALIDATION_ERROR", message: "表单数据不合法" } },
-      { status: 400 },
-    );
-  }
+  const { data, error: parseError } = await parseJsonBody(req, bodySchema);
+  if (parseError) return parseError;
 
   const result = await addTrainingToDay({
     userId,
-    cycleId: parsed.data.cycleId,
+    cycleId: data.cycleId,
     date,
-    name: parsed.data.name,
-    muscleGroups: parsed.data.muscleGroups,
-    today: parsed.data.today,
+    name: data.name,
+    muscleGroups: data.muscleGroups,
+    today: data.today,
   });
   if (!result.ok) {
     return dayError(result.reason);

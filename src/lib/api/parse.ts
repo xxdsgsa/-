@@ -1,7 +1,7 @@
 /**
  * API 路由层 Zod body 解析与统一 400 响应(Batch 4B refactor)
  *
- * 现状(16 路由):每个 POST/PATCH/DELETE 路由都重复 ~6 行
+ * 现状(17 处):大部分 POST/PATCH/DELETE 路由都重复 ~6 行
  *   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
  *   if (!parsed.success) {
  *     return NextResponse.json(
@@ -17,16 +17,18 @@
  *   // ... use data.X
  *
  * 行为零变化:响应体 + status code 与重构前完全一致(代码 + 自定义文案均保留)。
+ *
  * catch 行为统一为 `.catch(() => null)`,即使 req.json() 抛错也走 400 VALIDATION_ERROR 而非 500。
  *
  * 设计:
  * - 沿用 requireUserId() 的辨别联合模式({ data, error: null } | { data: null, error: NextResponse }),
  *   保证 ts strict 下 `if (error) return error;` 之后 data 被正确 narrow 为 T。
  * - 文案默认 "表单数据不合法",但允许每个调用方传自己的(errorMessage 参数)— 抽的是样板,
- *   不是文案。已确认 4 路由传自定义 message(diet items/body-weight/water-logs/supplement-logs),
- *   其余 12 路由走默认。
+ *   不是文案。多数路由走默认;少数路由(diet items POST/PATCH、water-logs)传自定义 message。
  * - 不导出 query/searchParams 解析版本:GET 路由的 searchParams 模式各不同(空值省略等),
  *   强行抽会引入复杂可选值合并逻辑,得不偿失。/api/auth/check-email 单独保留手写。
+ *
+ * 覆盖统计:src/app/api/** 下 17 处 safeParse(await req.json()) 已全部抽到本 helper,grep 验证 0 残留。
  */
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";

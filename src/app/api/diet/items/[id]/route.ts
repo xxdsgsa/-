@@ -8,6 +8,7 @@ import { z } from "zod";
 
 import { requireUserId } from "@/lib/api/auth";
 import { dietError } from "@/lib/api-diet";
+import { parseJsonBody } from "@/lib/api/parse";
 import { deleteDietItem, updateDietItem } from "@/lib/db/queries/diet";
 
 const UUID_RE = /^[0-9a-f-]{36}$/;
@@ -35,19 +36,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     );
   }
 
-  const parsed = bodySchema.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) {
-    return NextResponse.json(
-      { success: false, error: { code: "VALIDATION_ERROR", message: "请输入 1~5000 之间的数值" } },
-      { status: 400 },
-    );
-  }
+  const { data, error: parseError } = await parseJsonBody(
+    req,
+    bodySchema,
+    "请输入 1~5000 之间的数值",
+  );
+  if (parseError) return parseError;
 
   const r = await updateDietItem({
     userId,
     itemId: id,
-    grams: parsed.data.grams,
-    today: parsed.data.today,
+    grams: data.grams,
+    today: data.today,
   });
   if (!r.ok) return dietError(r.reason);
   return NextResponse.json({ success: true, data: null });

@@ -9,6 +9,7 @@ import { z } from "zod";
 
 import { requireUserId } from "@/lib/api/auth";
 import { dayError } from "@/lib/api-days";
+import { parseJsonBody } from "@/lib/api/parse";
 import { logSet } from "@/lib/db/queries/training-sessions";
 
 const WEIGHT_RE = /^\d{1,4}(\.\d)?$/;
@@ -34,21 +35,16 @@ export async function POST(req: NextRequest, ctx: Ctx) {
     );
   }
 
-  const parsed = bodySchema.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) {
-    return NextResponse.json(
-      { success: false, error: { code: "VALIDATION_ERROR", message: "表单数据不合法" } },
-      { status: 400 },
-    );
-  }
+  const { data, error: parseError } = await parseJsonBody(req, bodySchema);
+  if (parseError) return parseError;
 
   const result = await logSet({
     userId,
     sessionId: id,
-    trainingItemId: parsed.data.trainingItemId,
-    setIndex: parsed.data.setIndex,
-    weight: parsed.data.weight ?? null,
-    reps: parsed.data.reps ?? null,
+    trainingItemId: data.trainingItemId,
+    setIndex: data.setIndex,
+    weight: data.weight ?? null,
+    reps: data.reps ?? null,
   });
   if (!result.ok) return dayError(result.reason);
 

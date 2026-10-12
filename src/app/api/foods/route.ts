@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { requireUserId } from "@/lib/api/auth";
+import { parseJsonBody } from "@/lib/api/parse";
 import { createFood, searchFoods } from "@/lib/db/queries/diet";
 
 const querySchema = z.object({
@@ -53,15 +54,10 @@ export async function POST(req: NextRequest) {
   const { userId, error } = await requireUserId();
   if (error) return error;
 
-  const parsed = bodySchema.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) {
-    return NextResponse.json(
-      { success: false, error: { code: "VALIDATION_ERROR", message: "表单数据不合法" } },
-      { status: 400 },
-    );
-  }
+  const { data, error: parseError } = await parseJsonBody(req, bodySchema);
+  if (parseError) return parseError;
 
-  const food = await createFood(userId, parsed.data);
+  const food = await createFood(userId, data);
   return NextResponse.json(
     { success: true, data: { food: { id: food.id, owner: "mine" as const } } },
     { status: 201 },

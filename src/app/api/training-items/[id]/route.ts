@@ -9,6 +9,7 @@ import { z } from "zod";
 
 import { requireUserId } from "@/lib/api/auth";
 import { dayError } from "@/lib/api-days";
+import { parseJsonBody } from "@/lib/api/parse";
 import { deleteTrainingItem, updateTrainingItem } from "@/lib/db/queries/training-items";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -41,25 +42,20 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
     );
   }
 
-  const parsed = bodySchema.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) {
-    return NextResponse.json(
-      { success: false, error: { code: "VALIDATION_ERROR", message: "表单数据不合法" } },
-      { status: 400 },
-    );
-  }
+  const { data, error: parseError } = await parseJsonBody(req, bodySchema);
+  if (parseError) return parseError;
 
   const result = await updateTrainingItem({
     userId,
     itemId: id,
     body: {
-      ...(parsed.data.sets !== undefined ? { sets: parsed.data.sets } : {}),
-      ...(parsed.data.reps !== undefined ? { reps: parsed.data.reps } : {}),
-      ...(parsed.data.targetWeight !== undefined ? { targetWeight: parsed.data.targetWeight } : {}),
-      ...(parsed.data.restSeconds !== undefined ? { restSeconds: parsed.data.restSeconds } : {}),
-      ...(parsed.data.note !== undefined ? { note: parsed.data.note } : {}),
+      ...(data.sets !== undefined ? { sets: data.sets } : {}),
+      ...(data.reps !== undefined ? { reps: data.reps } : {}),
+      ...(data.targetWeight !== undefined ? { targetWeight: data.targetWeight } : {}),
+      ...(data.restSeconds !== undefined ? { restSeconds: data.restSeconds } : {}),
+      ...(data.note !== undefined ? { note: data.note } : {}),
     },
-    today: parsed.data.today,
+    today: data.today,
   });
   if (!result.ok) return dayError(result.reason);
 

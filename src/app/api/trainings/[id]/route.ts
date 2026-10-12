@@ -9,6 +9,7 @@ import { z } from "zod";
 
 import { requireUserId } from "@/lib/api/auth";
 import { dayError } from "@/lib/api-days";
+import { parseJsonBody } from "@/lib/api/parse";
 import { MUSCLE_GROUPS } from "@/lib/cycles";
 import { deleteTraining, updateTraining } from "@/lib/db/queries/training-days";
 
@@ -38,8 +39,9 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
     );
   }
 
-  const parsed = patchSchema.safeParse(await req.json().catch(() => null));
-  if (!parsed.success || (!parsed.data.name && !parsed.data.muscleGroups)) {
+  const { data, error: parseError } = await parseJsonBody(req, patchSchema);
+  if (parseError) return parseError;
+  if (!data.name && !data.muscleGroups) {
     return NextResponse.json(
       { success: false, error: { code: "VALIDATION_ERROR", message: "表单数据不合法" } },
       { status: 400 },
@@ -49,9 +51,9 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
   const result = await updateTraining({
     userId,
     trainingId: id,
-    name: parsed.data.name,
-    muscleGroups: parsed.data.muscleGroups,
-    today: parsed.data.today,
+    name: data.name,
+    muscleGroups: data.muscleGroups,
+    today: data.today,
   });
   if (!result.ok) {
     return dayError(result.reason);

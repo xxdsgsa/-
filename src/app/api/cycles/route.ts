@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { requireUserId } from "@/lib/api/auth";
+import { parseJsonBody } from "@/lib/api/parse";
 import { createCycle } from "@/lib/db/queries/cycles";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -24,15 +25,10 @@ export async function POST(req: NextRequest) {
   const { userId, error } = await requireUserId();
   if (error) return error;
 
-  const parsed = bodySchema.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) {
-    return NextResponse.json(
-      { success: false, error: { code: "VALIDATION_ERROR", message: "表单数据不合法" } },
-      { status: 400 },
-    );
-  }
+  const { data, error: parseError } = await parseJsonBody(req, bodySchema);
+  if (parseError) return parseError;
 
-  const { name, startDate, endDate, today, force } = parsed.data;
+  const { name, startDate, endDate, today, force } = data;
   if (endDate <= startDate) {
     return NextResponse.json(
       { success: false, error: { code: "VALIDATION_ERROR", message: "结束日期必须晚于开始日期" } },
