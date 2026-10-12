@@ -10,6 +10,7 @@ import { z } from "zod";
 import { requireUserId } from "@/lib/api/auth";
 import { DATE_RE } from "@/lib/api/params";
 import { dayError } from "@/lib/api/days";
+import { parseJsonBody } from "@/lib/api/parse";
 import { startSession } from "@/lib/db/queries/training-sessions";
 
 const bodySchema = z.object({
@@ -30,18 +31,13 @@ export async function POST(req: NextRequest, ctx: Ctx) {
     );
   }
 
-  const parsed = bodySchema.safeParse((await req.json().catch(() => ({}))) ?? {});
-  if (!parsed.success) {
-    return NextResponse.json(
-      { success: false, error: { code: "VALIDATION_ERROR", message: "表单数据不合法" } },
-      { status: 400 },
-    );
-  }
+  const { data, error: parseError } = await parseJsonBody(req, bodySchema);
+  if (parseError) return parseError;
 
   const result = await startSession({
     userId,
     trainingId: id,
-    today: parsed.data.today,
+    today: data.today,
   });
   if (!result.ok) return dayError(result.reason);
 
