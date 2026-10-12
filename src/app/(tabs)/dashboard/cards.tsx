@@ -455,12 +455,17 @@ export function SupplementCard({ supplements }: { supplements: DashboardData["su
           </p>
         </div>
         {list.length > 0 ? (
-          <Button size="sm" onClick={() => setOpen(true)}>
-            打卡
-          </Button>
+          <div className="flex shrink-0 gap-1.5">
+            <Button size="sm" variant="outline" asChild>
+              <Link href="/supplements">管理</Link>
+            </Button>
+            <Button size="sm" onClick={() => setOpen(true)}>
+              打卡
+            </Button>
+          </div>
         ) : (
           <Button size="sm" variant="outline" asChild>
-            <Link href="/diet">去添加</Link>
+            <Link href="/supplements/new">去添加</Link>
           </Button>
         )}
       </CardContent>
