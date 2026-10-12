@@ -13,12 +13,10 @@
  */
 import { and, eq, lte } from "drizzle-orm";
 
+import { calcCoolingRemaining, DELETION_COOLING_DAYS } from "@/lib/account-calc";
 import { db } from "@/db";
 import { nutritionGoals, users } from "@/db/schema";
 import { getNutritionGoals } from "./onboarding";
-
-/** PRD 3.6.8 冷静期:15 天 */
-export const DELETION_COOLING_DAYS = 15;
 
 export interface UserProfile {
   id: string;
@@ -98,9 +96,7 @@ export async function getDeletionStatus(userId: string): Promise<DeletionStatus>
   if (!row?.deletionRequestedAt) {
     return { inCooling: false, requestedAt: null, remainingDays: null };
   }
-  const ms = Date.now() - row.deletionRequestedAt.getTime();
-  const elapsedDays = ms / (24 * 60 * 60 * 1000);
-  const remaining = Math.ceil(DELETION_COOLING_DAYS - elapsedDays);
+  const remaining = calcCoolingRemaining(row.deletionRequestedAt);
   return {
     inCooling: true,
     requestedAt: row.deletionRequestedAt,
