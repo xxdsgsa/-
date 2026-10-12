@@ -4,7 +4,9 @@
  * 提供:
  * - DATE_RE 常量:YYYY-MM-DD 正则,跨域统一(已确认 13 路由 + diet/items 内联共 14 处使用)
  * - parseUuidParam:UUID 路径参数校验,失败返回 400 + 文案"参数不合法"
+ *   - 覆盖 12 个 [id] 路由(sessions × 3、trainings × 3、training-items × 2、exercises、foods、diet/items、cycles × 2)
  * - parseDateParam:YYYY-MM-DD 路径参数校验,失败返回 400 + 文案"日期不合法"
+ *   - 覆盖 2 个 [date] 路由(days/[date]/trainings、days/[date]/set-rest)
  *
  * 适用:
  * - parseUuidParam 用于所有 /api 路由(单段 id 路径参数)

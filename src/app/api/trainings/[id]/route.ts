@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { requireUserId } from "@/lib/api/auth";
-import { DATE_RE } from "@/lib/api/params";
+import { DATE_RE, parseUuidParam } from "@/lib/api/params";
 import { dayError } from "@/lib/api/days";
 import { parseJsonBody } from "@/lib/api/parse";
 import { MUSCLE_GROUPS } from "@/lib/cycles";
@@ -30,13 +30,8 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
   const { userId, error } = await requireUserId();
   if (error) return error;
 
-  const { id } = await ctx.params;
-  if (!z.string().uuid().safeParse(id).success) {
-    return NextResponse.json(
-      { success: false, error: { code: "VALIDATION_ERROR", message: "训练 ID 不合法" } },
-      { status: 400 },
-    );
-  }
+  const { value: id, error: idError } = await parseUuidParam(ctx, "id", "训练 ID 不合法");
+  if (idError) return idError;
 
   const { data, error: parseError } = await parseJsonBody(req, patchSchema);
   if (parseError) return parseError;
@@ -65,13 +60,8 @@ export async function DELETE(req: NextRequest, ctx: Ctx) {
   const { userId, error } = await requireUserId();
   if (error) return error;
 
-  const { id } = await ctx.params;
-  if (!z.string().uuid().safeParse(id).success) {
-    return NextResponse.json(
-      { success: false, error: { code: "VALIDATION_ERROR", message: "训练 ID 不合法" } },
-      { status: 400 },
-    );
-  }
+  const { value: id, error: idError } = await parseUuidParam(ctx, "id", "训练 ID 不合法");
+  if (idError) return idError;
 
   // today 由查询参数透传(客户端日历日,ADR-12)
   const today = new URL(req.url).searchParams.get("today") ?? undefined;

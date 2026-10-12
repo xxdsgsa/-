@@ -10,7 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { requireUserId } from "@/lib/api/auth";
-import { DATE_RE } from "@/lib/api/params";
+import { DATE_RE, parseUuidParam } from "@/lib/api/params";
 import { parseJsonBody } from "@/lib/api/parse";
 import { deleteCycle, updateCycle } from "@/lib/db/queries/cycles";
 
@@ -34,13 +34,8 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
   const { userId, error } = await requireUserId();
   if (error) return error;
 
-  const { id } = await ctx.params;
-  if (!z.string().uuid().safeParse(id).success) {
-    return NextResponse.json(
-      { success: false, error: { code: "VALIDATION_ERROR", message: "周期 ID 不合法" } },
-      { status: 400 },
-    );
-  }
+  const { value: id, error: idError } = await parseUuidParam(ctx, "id", "周期 ID 不合法");
+  if (idError) return idError;
 
   const { data, error: parseError } = await parseJsonBody(req, patchSchema);
   if (parseError) return parseError;
@@ -88,13 +83,8 @@ export async function DELETE(_req: NextRequest, ctx: Ctx) {
   const { userId, error } = await requireUserId();
   if (error) return error;
 
-  const { id } = await ctx.params;
-  if (!z.string().uuid().safeParse(id).success) {
-    return NextResponse.json(
-      { success: false, error: { code: "VALIDATION_ERROR", message: "周期 ID 不合法" } },
-      { status: 400 },
-    );
-  }
+  const { value: id, error: idError } = await parseUuidParam(ctx, "id", "周期 ID 不合法");
+  if (idError) return idError;
 
   const deleted = await deleteCycle(userId, id);
   if (!deleted) {

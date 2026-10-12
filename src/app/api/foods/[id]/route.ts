@@ -9,9 +9,8 @@ import { z } from "zod";
 import { requireUserId } from "@/lib/api/auth";
 import { dietError } from "@/lib/api/diet";
 import { parseJsonBody } from "@/lib/api/parse";
+import { parseUuidParam } from "@/lib/api/params";
 import { deleteFood, updateFood } from "@/lib/db/queries/diet";
-
-const UUID_RE = /^[0-9a-f-]{36}$/;
 
 const per100 = z
   .number()
@@ -28,16 +27,13 @@ const bodySchema = z.object({
   isLiquid: z.boolean().optional(),
 });
 
-export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+type Ctx = { params: Promise<{ id: string }> };
+
+export async function PATCH(req: NextRequest, ctx: Ctx) {
   const { userId, error } = await requireUserId();
   if (error) return error;
-  const { id } = await params;
-  if (!UUID_RE.test(id)) {
-    return NextResponse.json(
-      { success: false, error: { code: "VALIDATION_ERROR", message: "参数不合法" } },
-      { status: 400 },
-    );
-  }
+  const { value: id, error: idError } = await parseUuidParam(ctx);
+  if (idError) return idError;
 
   const { data, error: parseError } = await parseJsonBody(req, bodySchema);
   if (parseError) return parseError;
@@ -47,16 +43,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   return NextResponse.json({ success: true, data: null });
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(_req: NextRequest, ctx: Ctx) {
   const { userId, error } = await requireUserId();
   if (error) return error;
-  const { id } = await params;
-  if (!UUID_RE.test(id)) {
-    return NextResponse.json(
-      { success: false, error: { code: "VALIDATION_ERROR", message: "参数不合法" } },
-      { status: 400 },
-    );
-  }
+  const { value: id, error: idError } = await parseUuidParam(ctx);
+  if (idError) return idError;
 
   const r = await deleteFood(userId, id);
   if (!r.ok) return dietError(r.reason);

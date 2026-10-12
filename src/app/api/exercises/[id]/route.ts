@@ -10,6 +10,7 @@ import { z } from "zod";
 import { requireUserId } from "@/lib/api/auth";
 import { dayError } from "@/lib/api/days";
 import { parseJsonBody } from "@/lib/api/parse";
+import { parseUuidParam } from "@/lib/api/params";
 import { MUSCLE_GROUPS } from "@/lib/cycles";
 import { deleteExercise, updateExercise } from "@/lib/db/queries/exercises";
 
@@ -25,13 +26,8 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
   const { userId, error } = await requireUserId();
   if (error) return error;
 
-  const { id } = await ctx.params;
-  if (!z.string().uuid().safeParse(id).success) {
-    return NextResponse.json(
-      { success: false, error: { code: "VALIDATION_ERROR", message: "参数不合法" } },
-      { status: 400 },
-    );
-  }
+  const { value: id, error: idError } = await parseUuidParam(ctx);
+  if (idError) return idError;
 
   const { data, error: parseError } = await parseJsonBody(req, bodySchema);
   if (parseError) return parseError;
@@ -52,13 +48,8 @@ export async function DELETE(_req: NextRequest, ctx: Ctx) {
   const { userId, error } = await requireUserId();
   if (error) return error;
 
-  const { id } = await ctx.params;
-  if (!z.string().uuid().safeParse(id).success) {
-    return NextResponse.json(
-      { success: false, error: { code: "VALIDATION_ERROR", message: "参数不合法" } },
-      { status: 400 },
-    );
-  }
+  const { value: id, error: idError } = await parseUuidParam(ctx);
+  if (idError) return idError;
 
   const result = await deleteExercise(userId, id);
   if (!result.ok) return dayError(result.reason);

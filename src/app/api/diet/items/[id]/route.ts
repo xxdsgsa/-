@@ -7,12 +7,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { requireUserId } from "@/lib/api/auth";
-import { DATE_RE } from "@/lib/api/params";
+import { DATE_RE, parseUuidParam } from "@/lib/api/params";
 import { dietError } from "@/lib/api/diet";
 import { parseJsonBody } from "@/lib/api/parse";
 import { deleteDietItem, updateDietItem } from "@/lib/db/queries/diet";
-
-const UUID_RE = /^[0-9a-f-]{36}$/;
 
 const grams = z
   .number()
@@ -25,16 +23,13 @@ const bodySchema = z.object({
   today: z.string().regex(DATE_RE).optional(),
 });
 
-export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+type Ctx = { params: Promise<{ id: string }> };
+
+export async function PATCH(req: NextRequest, ctx: Ctx) {
   const { userId, error } = await requireUserId();
   if (error) return error;
-  const { id } = await params;
-  if (!UUID_RE.test(id)) {
-    return NextResponse.json(
-      { success: false, error: { code: "VALIDATION_ERROR", message: "参数不合法" } },
-      { status: 400 },
-    );
-  }
+  const { value: id, error: idError } = await parseUuidParam(ctx);
+  if (idError) return idError;
 
   const { data, error: parseError } = await parseJsonBody(
     req,
@@ -53,16 +48,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   return NextResponse.json({ success: true, data: null });
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(req: NextRequest, ctx: Ctx) {
   const { userId, error } = await requireUserId();
   if (error) return error;
-  const { id } = await params;
-  if (!UUID_RE.test(id)) {
-    return NextResponse.json(
-      { success: false, error: { code: "VALIDATION_ERROR", message: "参数不合法" } },
-      { status: 400 },
-    );
-  }
+  const { value: id, error: idError } = await parseUuidParam(ctx);
+  if (idError) return idError;
 
   const today = req.nextUrl.searchParams.get("today") ?? undefined;
   const r = await deleteDietItem({ userId, itemId: id, today });

@@ -10,6 +10,7 @@ import { z } from "zod";
 import { requireUserId } from "@/lib/api/auth";
 import { dayError } from "@/lib/api/days";
 import { parseJsonBody } from "@/lib/api/parse";
+import { parseUuidParam } from "@/lib/api/params";
 import { logSet } from "@/lib/db/queries/training-sessions";
 
 const WEIGHT_RE = /^\d{1,4}(\.\d)?$/;
@@ -27,13 +28,8 @@ export async function POST(req: NextRequest, ctx: Ctx) {
   const { userId, error } = await requireUserId();
   if (error) return error;
 
-  const { id } = await ctx.params;
-  if (!z.string().uuid().safeParse(id).success) {
-    return NextResponse.json(
-      { success: false, error: { code: "VALIDATION_ERROR", message: "参数不合法" } },
-      { status: 400 },
-    );
-  }
+  const { value: id, error: idError } = await parseUuidParam(ctx);
+  if (idError) return idError;
 
   const { data, error: parseError } = await parseJsonBody(req, bodySchema);
   if (parseError) return parseError;

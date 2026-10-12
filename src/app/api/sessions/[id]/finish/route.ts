@@ -9,6 +9,7 @@ import { z } from "zod";
 
 import { requireUserId } from "@/lib/api/auth";
 import { dayError } from "@/lib/api/days";
+import { parseUuidParam } from "@/lib/api/params";
 import { finishSession } from "@/lib/db/queries/training-sessions";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -17,13 +18,8 @@ export async function POST(_req: NextRequest, ctx: Ctx) {
   const { userId, error } = await requireUserId();
   if (error) return error;
 
-  const { id } = await ctx.params;
-  if (!z.string().uuid().safeParse(id).success) {
-    return NextResponse.json(
-      { success: false, error: { code: "VALIDATION_ERROR", message: "参数不合法" } },
-      { status: 400 },
-    );
-  }
+  const { value: id, error: idError } = await parseUuidParam(ctx);
+  if (idError) return idError;
 
   const result = await finishSession({ userId, sessionId: id });
   if (!result.ok) return dayError(result.reason);

@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { requireUserId } from "@/lib/api/auth";
-import { DATE_RE } from "@/lib/api/params";
+import { DATE_RE, parseUuidParam } from "@/lib/api/params";
 import { dayError } from "@/lib/api/days";
 import { parseJsonBody } from "@/lib/api/parse";
 import { deleteTrainingItem, updateTrainingItem } from "@/lib/db/queries/training-items";
@@ -26,21 +26,12 @@ const bodySchema = z.object({
 
 type Ctx = { params: Promise<{ id: string }> };
 
-function badId(id: string) {
-  return !z.string().uuid().safeParse(id).success;
-}
-
 export async function PATCH(req: NextRequest, ctx: Ctx) {
   const { userId, error } = await requireUserId();
   if (error) return error;
 
-  const { id } = await ctx.params;
-  if (badId(id)) {
-    return NextResponse.json(
-      { success: false, error: { code: "VALIDATION_ERROR", message: "参数不合法" } },
-      { status: 400 },
-    );
-  }
+  const { value: id, error: idError } = await parseUuidParam(ctx);
+  if (idError) return idError;
 
   const { data, error: parseError } = await parseJsonBody(req, bodySchema);
   if (parseError) return parseError;
@@ -66,13 +57,8 @@ export async function DELETE(req: NextRequest, ctx: Ctx) {
   const { userId, error } = await requireUserId();
   if (error) return error;
 
-  const { id } = await ctx.params;
-  if (badId(id)) {
-    return NextResponse.json(
-      { success: false, error: { code: "VALIDATION_ERROR", message: "参数不合法" } },
-      { status: 400 },
-    );
-  }
+  const { value: id, error: idError } = await parseUuidParam(ctx);
+  if (idError) return idError;
 
   const today = req.nextUrl.searchParams.get("today") ?? undefined;
   const result = await deleteTrainingItem({ userId, itemId: id, today });
