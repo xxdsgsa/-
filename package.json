@@ -13,7 +13,9 @@
     "db:seed": "tsc src/db/seed.ts --module commonjs --target es2022 --moduleResolution node --esModuleInterop --skipLibCheck --outDir node_modules/.cache/db-seed && node --env-file=.env node_modules/.cache/db-seed/seed.js",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test",
+    "test:e2e:install": "playwright install chromium"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
@@ -33,6 +35,7 @@
     "zod": "^4.6.2"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.0",
     "@tailwindcss/postcss": "^4",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/react": "^16.3.3",
