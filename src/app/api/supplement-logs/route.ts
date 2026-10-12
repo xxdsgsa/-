@@ -1,15 +1,23 @@
 /**
- * POST /api/supplement-logs —— 补剂打卡(PRD 3.7.6/3.9.3)
- * body: { supplementId, dose? }:剂量默认补剂单次剂量,可覆盖(>0,最多 1 位小数)。
+ * /api/supplement-logs —— 补剂打卡(PRD 3.9;首页卡片 3.7.6)
+ * POST  打卡(已实现,客户端卡片调用)
+ * GET   今日打卡记录列表(日期由 query ?date= 传入,缺省 serverToday)
+ * DELETE /api/supplement-logs/[id] —— 删除单条(左滑删除,3.9.3)
+ *
  * 归属校验在服务层(带 user_id);仅当日。
  */
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { requireUserId } from "@/lib/api/auth";
+import { DATE_RE } from "@/lib/api/params";
 import { parseJsonBody } from "@/lib/api/parse";
 import { serverToday } from "@/lib/date";
-import { addSupplementLog, getTodaySupplementCount } from "@/lib/db/queries/supplements";
+import {
+  addSupplementLog,
+  getTodaySupplementCount,
+  listSupplementLogs,
+} from "@/lib/db/queries/supplements";
 
 const bodySchema = z.object({
   supplementId: z.string().uuid(),
@@ -48,4 +56,15 @@ export async function POST(req: NextRequest) {
 
   const todayCount = await getTodaySupplementCount(userId, today);
   return NextResponse.json({ success: true, data: { todayCount } }, { status: 201 });
+}
+
+export async function GET(req: NextRequest) {
+  const { userId, error } = await requireUserId();
+  if (error) return error;
+
+  const dateParam = req.nextUrl.searchParams.get("date");
+  const date = dateParam && DATE_RE.test(dateParam) ? dateParam : serverToday();
+
+  const logs = await listSupplementLogs(userId, date);
+  return NextResponse.json({ success: true, data: { logs, date } });
 }
