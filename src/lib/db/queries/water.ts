@@ -4,6 +4,7 @@
  */
 import { and, desc, eq, sql } from "drizzle-orm";
 
+import { trackRecord } from "@/lib/analytics";
 import { serverToday } from "@/lib/date";
 
 import { db } from "@/db";
@@ -19,6 +20,7 @@ export async function addWaterLog(input: {
     date: input.date,
     amountMl: input.amountMl,
   });
+  await trackRecord(input.userId, "water_intake", { amount_ml: input.amountMl, date: input.date });
 }
 
 /** 当日饮水总量(ml) */

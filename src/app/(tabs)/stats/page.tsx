@@ -11,6 +11,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { LineChart } from "@/components/line-chart";
+import { trackPageView } from "@/lib/analytics";
 import { auth } from "@/lib/auth";
 import { formatDateLabel, serverToday } from "@/lib/date";
 import { getDashboardData } from "@/lib/db/queries/dashboard";
@@ -57,6 +58,9 @@ export default async function StatsPage({
     .getSession({ headers: await headers() })
     .catch(() => null);
   if (!session) redirect("/login");
+
+  // 口径 2:数据面板查看(去重由 user_id 在聚合时 distinct)
+  await trackPageView(session.user.id, "/stats");
 
   const today = serverToday();
   // 当月 YYYY-MM(默认今日所在月;后续可读 ?month= 切换历史月份,3.11.6 评审 3)

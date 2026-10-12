@@ -4,6 +4,7 @@
  */
 import { and, asc, count, desc, eq, isNull } from "drizzle-orm";
 
+import { trackRecord } from "@/lib/analytics";
 import { serverToday } from "@/lib/date";
 
 import { db } from "@/db";
@@ -48,6 +49,10 @@ export async function addSupplementLog(input: {
     name: supplement.name,
     unit: supplement.unit,
     dose: input.dose ?? supplement.dose,
+    date: input.date,
+  });
+  await trackRecord(input.userId, "supplement_checkin", {
+    supplement_id: supplement.id,
     date: input.date,
   });
   return true;

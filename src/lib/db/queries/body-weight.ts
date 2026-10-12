@@ -4,6 +4,8 @@
  */
 import { and, eq } from "drizzle-orm";
 
+import { trackRecord } from "@/lib/analytics";
+
 import { db } from "@/db";
 import { bodyWeightRecords } from "@/db/schema";
 
@@ -34,5 +36,6 @@ export async function upsertBodyWeight(input: {
       set: { weightKg: input.weightKg },
     })
     .returning();
+  await trackRecord(input.userId, "body_weight", { date: input.date });
   return row;
 }

@@ -13,6 +13,7 @@
  */
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 
+import { trackRecord } from "@/lib/analytics";
 import { weekdayCN } from "@/lib/cycles";
 import { serverToday } from "@/lib/date";
 
@@ -547,6 +548,11 @@ export async function finishSession(input: {
     .update(trainingSessions)
     .set({ status: "已完成", endedAt: now, durationSeconds: duration })
     .where(eq(trainingSessions.id, input.sessionId));
+  await trackRecord(input.userId, "training_session", {
+    session_id: input.sessionId,
+    date: chain.session.date,
+    duration_seconds: duration,
+  });
   return { ok: true, data: { durationSeconds: duration } };
 }
 

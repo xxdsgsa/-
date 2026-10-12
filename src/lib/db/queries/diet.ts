@@ -10,6 +10,7 @@
  */
 import { and, asc, eq, ilike, isNull, or, sql } from "drizzle-orm";
 
+import { trackRecord } from "@/lib/analytics";
 import { weekdayCN } from "@/lib/cycles";
 import { serverToday } from "@/lib/date";
 
@@ -326,6 +327,11 @@ export async function addDietItem(input: {
       grams: String(input.grams),
     })
     .returning();
+  await trackRecord(input.userId, "diet_item", {
+    date: input.date,
+    meal_type: input.mealType,
+    food_id: food.id,
+  });
   return { ok: true, data: item };
 }
 
