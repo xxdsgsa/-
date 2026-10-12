@@ -5,12 +5,13 @@
  * - requestDeletion:申请注销(写 deletionRequestedAt = now())
  * - cancelDeletion:冷静期内取消注销(清空 deletionRequestedAt)
  * - getDeletionStatus:读取注销状态与冷静期剩余天数
+ * - purgeExpiredUsers:扫描冷静期满用户并物理删除(3.6.8)
  * - findUser:按 id 查基础信息(注销流程用)
  *
- * 物理删除(purgeExpiredDeletions)在定时任务或登录时触发(后续可挂入
- * refreshCycleStatuses 同位置)。当前实现仅提供函数,不在 API 中调用。
+ * 物理删除触发点:(tabs)/layout.tsx 每次登录会话拉取时调用,无外部 cron 依赖。
+ * 所有用户表 ON DELETE CASCADE(见 schema.ts),用户行删除即级联清理。
  */
-import { and, eq } from "drizzle-orm";
+import { and, eq, lte } from "drizzle-orm";
 
 import { db } from "@/db";
 import { nutritionGoals, users } from "@/db/schema";
@@ -191,4 +192,28 @@ export async function findUser(userId: string) {
     .where(eq(users.id, userId))
     .limit(1);
   return row ?? null;
+}
+
+/**
+ * 物理删除冷静期满用户(3.6.8):返回被删除的 userId 列表
+ *
+ * 触发策略:
+ * - 调用前:确认未在事务里(本身是单次 SQL 查询 + 多行 DELETE,CASCADE 自行处理)
+ * - 调用频:(tabs)/layout.tsx 每次页面请求都调,15 天阈值查询命中时即时清理
+ * - 影响范围:仅删超过 15 天的 deletionRequestedAt,正常用户不被触及
+ */
+export async function purgeExpiredUsers(now = new Date()): Promise<string[]> {
+  const cutoff = new Date(now.getTime() - DELETION_COOLING_DAYS * 24 * 60 * 60 * 1000);
+  // 先查要删的 ids(用于返回 + 日志)
+  const expired = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(and(lte(users.deletionRequestedAt, cutoff)));
+  if (expired.length === 0) return [];
+
+  for (const row of expired) {
+    // 关联表大多 ON DELETE CASCADE;users + sessions + accounts + verifications 都会自动级联
+    await db.delete(users).where(eq(users.id, row.id));
+  }
+  return expired.map((r) => r.id);
 }

@@ -6,12 +6,17 @@
  * 守卫判据:用 DB 侧 isOnboarded() 查询 users.onboarded_at,不再依赖
  * session payload 中 additionalFields 的透传(Batch 1 修复,2026-10-11)。
  * 即便 Better Auth session 不带 onboardedAt 字段,守卫也始终可信。
+ *
+ * 注销冷静期(3.6.8):layout 拉取 deletionRequestedAt,若在冷静期则渲染
+ * 不可关闭的全屏提示弹窗。同时执行 purgeExpiredUsers(15 天过期即物理删除)。
  */
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { BottomNav } from "@/components/bottom-nav";
+import { CoolingAlert } from "@/components/cooling-alert";
 import { auth } from "@/lib/auth";
+import { getDeletionStatus, purgeExpiredUsers } from "@/lib/db/queries/account";
 import { isOnboarded } from "@/lib/db/queries/onboarding";
 
 export default async function TabsLayout({ children }: { children: React.ReactNode }) {
@@ -20,12 +25,21 @@ export default async function TabsLayout({ children }: { children: React.ReactNo
     .getSession({ headers: await headers() })
     .catch(() => null);
   if (!session) redirect("/login");
+
+  // 物理删除:每次 layout 渲染时清理过期的注销申请(15 天前)
+  // 安全:仅删 deletionRequestedAt ≤ (now - 15d) 的用户,正常用户不受影响
+  await purgeExpiredUsers();
+
   if (!(await isOnboarded(session.user.id))) redirect("/onboarding");
+
+  const deletion = await getDeletionStatus(session.user.id);
+  const showCooling = deletion.inCooling && (deletion.remainingDays ?? 0) > 0;
 
   return (
     <div className="min-h-dvh pb-16">
       {children}
       <BottomNav />
+      {showCooling && <CoolingAlert remainingDays={deletion.remainingDays ?? 0} />}
     </div>
   );
 }
