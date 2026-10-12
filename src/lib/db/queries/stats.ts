@@ -21,6 +21,7 @@ import {
   trainingCycles,
   trainingDays,
   trainingSessions,
+  trainings,
 } from "@/db/schema";
 
 /* ============================================================
@@ -374,4 +375,100 @@ export async function listWeightRecent(userId: string, limit = 10) {
     .orderBy(desc(bodyWeightRecords.date), desc(bodyWeightRecords.createdAt))
     .limit(limit);
   return rows.map((r) => ({ date: r.date, weightKg: Number(r.weightKg) }));
+}
+
+/* ============================================================
+ * 训练日历(3.11.6):月历视图 + 点击当日摘要
+ * ============================================================ */
+
+export type DayKindForCalendar = "rest" | "completed" | "missed" | "not_done" | "no_plan" | "future";
+
+export interface CalendarDay {
+  date: string;
+  kind: DayKindForCalendar;
+  /** 当日训练名(无则 null) */
+  trainingNames: string[];
+}
+
+export interface CalendarMonth {
+  month: string; // YYYY-MM
+  days: CalendarDay[];
+}
+
+/** 月历:YYYY-MM 字符串 + 起止日(1 日 ~ 月末) */
+function monthBounds(month: string): { start: string; end: string } {
+  const [y, m] = month.split("-").map(Number);
+  // 当月 1 日
+  const startDate = new Date(Date.UTC(y, m - 1, 1));
+  // 下月 1 日 减 1 = 当月末
+  const endDate = new Date(Date.UTC(y, m, 0));
+  const fmt = (d: Date) =>
+    `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(
+      d.getUTCDate(),
+    ).padStart(2, "0")}`;
+  return { start: fmt(startDate), end: fmt(endDate) };
+}
+
+/**
+ * 给定月份(YYYY-MM),返回该月每日训练状态(3.11.6 四态 + 未来)
+ * - 通过复用 assessDays(单次 join cycles/days/sessions/marks 拉整个月)
+ */
+export async function getCalendarMonth(
+  userId: string,
+  month: string,
+  today?: string,
+): Promise<CalendarMonth> {
+  const t = today ?? serverToday();
+  const { start, end } = monthBounds(month);
+  const dates = dateRange(start, end);
+
+  const assess = await assessDays(userId, dates);
+
+  // 日历只展示四态(3.11.6 评审 3:不展示训练名,摘要走 ?day= 单独页)
+  const days: CalendarDay[] = dates.map((d) => ({
+    date: d,
+    kind: assess.get(d) ?? "no_plan",
+    trainingNames: [],
+  }));
+
+  return { month, days };
+}
+
+/**
+ * 当日训练摘要(3.11.6 点击日历日 → 摘要)
+ * 返回:训练名列表 + 状态;无训练日返回空数组
+ */
+export async function getDayTrainingSummary(
+  userId: string,
+  date: string,
+): Promise<{ date: string; trainings: { name: string; status: string }[] }> {
+  // 该日是否在任意 cycle 的 training_day
+  const dayList = await db
+    .select({ id: trainingDays.id })
+    .from(trainingDays)
+    .innerJoin(trainingCycles, eq(trainingCycles.id, trainingDays.cycleId))
+    .where(
+      and(eq(trainingCycles.userId, userId), eq(trainingDays.date, date)),
+    )
+    .limit(1);
+  if (dayList.length === 0) return { date, trainings: [] };
+
+  const rows = await db
+    .select({ name: trainings.name, status: trainingSessions.status })
+    .from(trainings)
+    .leftJoin(
+      trainingSessions,
+      and(
+        eq(trainingSessions.trainingId, trainings.id),
+        eq(trainingSessions.userId, userId),
+        eq(trainingSessions.date, date),
+      ),
+    )
+    .where(eq(trainings.trainingDayId, dayList[0].id))
+    .orderBy(trainings.sortOrder);
+
+  return {
+    date,
+    trainings: rows.map((t) => ({ name: t.name, status: t.status ?? "未开始" })),
+  };
 }

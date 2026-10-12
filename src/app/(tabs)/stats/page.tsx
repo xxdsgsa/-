@@ -1,17 +1,26 @@
 /**
- * 数据页(Tab 4,PRD 3.11):今日/周/月统计 + 体重趋势
+ * 数据页(Tab 4,PRD 3.11):今日/周/月统计 + 体重趋势 + 训练日历
  *
- * 单页滚动分区(3.11.2):今日 → 周 → 月 → 体重
+ * 单页滚动分区(3.11.2):今日 → 周 → 月 → 体重 → 训练日历
  * RSC 直出,无客户端交互(V1.0 不做图表,V1.1 再加)。
  * 今日段复用 DashboardData(3.11.3 规定与首页卡片同源只读)。
+ * 训练日历(3.11.6):月历视图 + 四态;P2 仍可后置,此 V1.0 同步交付基础版。
  */
 import { headers } from "next/headers";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/lib/auth";
 import { formatDateLabel, serverToday } from "@/lib/date";
 import { getDashboardData } from "@/lib/db/queries/dashboard";
-import { getMonthStats, getWeekStats, listWeightRecent, getWeightTrend } from "@/lib/db/queries/stats";
+import {
+  getCalendarMonth,
+  getDayTrainingSummary,
+  getMonthStats,
+  getWeekStats,
+  getWeightTrend,
+  listWeightRecent,
+} from "@/lib/db/queries/stats";
 
 function pct(cur: number, goal: number | null): number | null {
   if (goal == null || goal <= 0) return null;
@@ -38,20 +47,32 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   return <h2 className="mt-6 mb-2 text-sm font-semibold text-muted-foreground">{children}</h2>;
 }
 
-export default async function StatsPage() {
+export default async function StatsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const session = await auth.api
     .getSession({ headers: await headers() })
     .catch(() => null);
   if (!session) redirect("/login");
 
   const today = serverToday();
-  const [todayData, week, month, weightTrend, weightList] = await Promise.all([
-    getDashboardData(session.user.id, today),
-    getWeekStats(session.user.id, today),
-    getMonthStats(session.user.id, today),
-    getWeightTrend(session.user.id, "30d", today),
-    listWeightRecent(session.user.id, 10),
-  ]);
+  // 当月 YYYY-MM(默认今日所在月;后续可读 ?month= 切换历史月份,3.11.6 评审 3)
+  const currentMonth = today.slice(0, 7);
+  const params = await searchParams;
+  const dayParam = typeof params.day === "string" ? params.day : null;
+
+  const [todayData, week, month, weightTrend, weightList, calendar, daySummary] =
+    await Promise.all([
+      getDashboardData(session.user.id, today),
+      getWeekStats(session.user.id, today),
+      getMonthStats(session.user.id, today),
+      getWeightTrend(session.user.id, "30d", today),
+      listWeightRecent(session.user.id, 10),
+      getCalendarMonth(session.user.id, currentMonth, today),
+      dayParam ? getDayTrainingSummary(session.user.id, dayParam) : null,
+    ]);
 
   const kcalPct = pct(todayData.nutrition.kcal.current, todayData.nutrition.kcal.goal);
   const waterPct = pct(todayData.water.currentMl, todayData.water.goalMl);
@@ -262,9 +283,97 @@ export default async function StatsPage() {
         </p>
       )}
 
-      {/* 训练日历(3.11.6 P2 后置) */}
-      <SectionTitle>训练日历(计划中)</SectionTitle>
-      <p className="text-sm text-muted-foreground">月历视图 V1.x 接入</p>
+      {/* 训练日历(3.11.6):月历视图 + 四态标识 */}
+      <SectionTitle>训练日历 · {currentMonth}</SectionTitle>
+      <CalendarMonthView month={calendar} today={today} />
+
+      {/* 3.11.6 点击某日 → 摘要 */}
+      {daySummary && (
+        <div className="mt-3 rounded-lg border bg-card p-4">
+          <p className="text-sm font-medium">
+            {formatDateLabel(daySummary.date)} · 训练摘要
+          </p>
+          {daySummary.trainings.length === 0 ? (
+            <p className="mt-2 text-sm text-muted-foreground">当天无训练计划</p>
+          ) : (
+            <ul className="mt-2 space-y-1 text-sm">
+              {daySummary.trainings.map((t, i) => (
+                <li key={i} className="flex items-center justify-between">
+                  <span>{t.name}</span>
+                  <span className="text-muted-foreground">{t.status}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
     </main>
+  );
+}
+
+/* ============================================================
+ * 训练日历(3.11.6):月历网格
+ * ============================================================ */
+
+const DAY_KIND_BADGE: Record<string, string> = {
+  completed: "✅",
+  rest: "💤",
+  missed: "❌",
+  not_done: "○",
+  no_plan: "·",
+  future: "",
+};
+
+function CalendarMonthView({
+  month,
+  today,
+}: {
+  month: { month: string; days: { date: string; kind: string }[] };
+  today: string;
+}) {
+  // 把 days 装进 map + 补齐空格
+  const map = new Map(month.days.map((d) => [d.date, d.kind] as const));
+  const firstDate = month.days[0]?.date;
+  if (!firstDate) return null;
+  const [, mm, dd] = firstDate.split("-").map(Number);
+  // 1 日是星期几(0=Sun,1=Mon,...6=Sat);前面补空白
+  const firstDow = new Date(Date.UTC(Number(month.month.split("-")[0]), mm - 1, dd)).getUTCDay();
+  const cells: ({ date: string; kind: string } | null)[] = [];
+  for (let i = 0; i < firstDow; i++) cells.push(null);
+  for (const d of month.days) cells.push(d);
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  return (
+    <div className="rounded-lg border bg-card p-3">
+      <div className="mb-2 grid grid-cols-7 gap-1 text-center text-xs text-muted-foreground">
+        {["日", "一", "二", "三", "四", "五", "六"].map((w) => (
+          <div key={w}>{w}</div>
+        ))}
+      </div>
+      <div className="grid grid-cols-7 gap-1 text-center text-sm">
+        {cells.map((c, i) =>
+          c === null ? (
+            <div key={i} className="aspect-square" />
+          ) : (
+            <Link
+              key={c.date}
+              href={c.kind === "future" ? "#" : `/stats?day=${c.date}`}
+              aria-label={`${c.date} ${c.kind}`}
+              className={`flex aspect-square flex-col items-center justify-center rounded ${
+                c.date === today
+                  ? "bg-primary text-primary-foreground"
+                  : "hover:bg-muted"
+              } ${c.kind === "future" ? "text-muted-foreground/40" : ""}`}
+            >
+              <span className="text-xs tabular-nums">{c.date.slice(8)}</span>
+              <span className="text-[10px]">{DAY_KIND_BADGE[c.kind] ?? "·"}</span>
+            </Link>
+          ),
+        )}
+      </div>
+      <p className="mt-2 text-xs text-muted-foreground">
+        ○ 未完成 · ✅ 已完成 · ❌ 未训练 · 💤 休息日
+      </p>
+    </div>
   );
 }
