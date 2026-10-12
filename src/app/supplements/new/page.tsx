@@ -28,7 +28,7 @@ export default async function NewSupplementPage() {
         </Button>
         <h1 className="text-xl font-bold">添加补剂</h1>
       </div>
-      <SupplementForm mode="create" />
+      <SupplementForm mode="create" userId={session.user.id} />
     </main>
   );
 }

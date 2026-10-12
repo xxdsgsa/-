@@ -37,6 +37,7 @@ export default async function EditSupplementPage({ params }: Ctx) {
       </div>
       <SupplementForm
         mode="edit"
+        userId={session.user.id}
         id={detail.id}
         initial={{
           name: detail.name,
