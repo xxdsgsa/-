@@ -8,10 +8,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { requireUserId } from "@/lib/api/auth";
+import { DATE_RE } from "@/lib/api/params";
 import { dayError } from "@/lib/api-days";
 import { startSession } from "@/lib/db/queries/training-sessions";
-
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 const bodySchema = z.object({
   today: z.string().regex(DATE_RE).optional(),

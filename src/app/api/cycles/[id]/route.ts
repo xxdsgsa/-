@@ -10,10 +10,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { requireUserId } from "@/lib/api/auth";
+import { DATE_RE } from "@/lib/api/params";
 import { parseJsonBody } from "@/lib/api/parse";
 import { deleteCycle, updateCycle } from "@/lib/db/queries/cycles";
-
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 const patchSchema = z
   .object({

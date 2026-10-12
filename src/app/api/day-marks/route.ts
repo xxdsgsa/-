@@ -5,10 +5,9 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { requireUserId } from "@/lib/api/auth";
+import { DATE_RE } from "@/lib/api/params";
 import { serverToday } from "@/lib/date";
 import { undoMissedMark } from "@/lib/db/queries/training";
-
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export async function DELETE(req: NextRequest) {
   const { userId, error } = await requireUserId();

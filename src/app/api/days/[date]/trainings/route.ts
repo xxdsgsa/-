@@ -8,12 +8,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { requireUserId } from "@/lib/api/auth";
+import { DATE_RE, parseDateParam } from "@/lib/api/params";
 import { dayError } from "@/lib/api-days";
 import { parseJsonBody } from "@/lib/api/parse";
 import { MUSCLE_GROUPS } from "@/lib/cycles";
 import { addTrainingToDay } from "@/lib/db/queries/training-days";
-
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 const bodySchema = z.object({
   cycleId: z.string().uuid(),
@@ -31,13 +30,8 @@ export async function POST(req: NextRequest, ctx: Ctx) {
   const { userId, error } = await requireUserId();
   if (error) return error;
 
-  const { date } = await ctx.params;
-  if (!z.string().regex(DATE_RE).safeParse(date).success) {
-    return NextResponse.json(
-      { success: false, error: { code: "VALIDATION_ERROR", message: "日期不合法" } },
-      { status: 400 },
-    );
-  }
+  const { value: date, error: dateError } = await parseDateParam(ctx);
+  if (dateError) return dateError;
 
   const { data, error: parseError } = await parseJsonBody(req, bodySchema);
   if (parseError) return parseError;

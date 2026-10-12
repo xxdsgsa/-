@@ -8,11 +8,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { requireUserId } from "@/lib/api/auth";
+import { DATE_RE } from "@/lib/api/params";
 import { parseJsonBody } from "@/lib/api/parse";
 import { serverToday, serverYesterday } from "@/lib/date";
 import { completeOnboarding } from "@/lib/db/queries/onboarding";
-
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 const bodySchema = z.object({
   gender: z.enum(["male", "female"]),

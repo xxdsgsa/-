@@ -8,10 +8,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { requireUserId } from "@/lib/api/auth";
+import { DATE_RE } from "@/lib/api/params";
 import { parseJsonBody } from "@/lib/api/parse";
 import { createCycle } from "@/lib/db/queries/cycles";
-
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 const bodySchema = z.object({
   name: z.string().min(1).max(30),

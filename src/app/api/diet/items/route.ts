@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { requireUserId } from "@/lib/api/auth";
+import { DATE_RE } from "@/lib/api/params";
 import { dietError } from "@/lib/api-diet";
 import { parseJsonBody } from "@/lib/api/parse";
 import { addDietItem, MEAL_TYPES } from "@/lib/db/queries/diet";
@@ -18,11 +19,11 @@ const grams = z
   .refine((v) => Math.round(v * 10) === v * 10, "最多 1 位小数");
 
 const bodySchema = z.object({
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  date: z.string().regex(DATE_RE),
   mealType: z.enum(MEAL_TYPES),
   foodId: z.string().uuid(),
   grams,
-  today: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  today: z.string().regex(DATE_RE).optional(),
 });
 
 export async function POST(req: NextRequest) {

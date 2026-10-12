@@ -7,12 +7,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { requireUserId } from "@/lib/api/auth";
+import { DATE_RE } from "@/lib/api/params";
 import { dietError } from "@/lib/api-diet";
 import { parseJsonBody } from "@/lib/api/parse";
 import { deleteDietItem, updateDietItem } from "@/lib/db/queries/diet";
 
 const UUID_RE = /^[0-9a-f-]{36}$/;
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 const grams = z
   .number()
