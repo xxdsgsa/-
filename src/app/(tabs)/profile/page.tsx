@@ -7,14 +7,13 @@
  *
  * V1.0 暂不做资料编辑(下一次迭代);当前 RSC 拉取完整 profile 视图。
  */
-import { ChevronRight, Droplet } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { headers } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { DeletionButton } from "@/components/deletion-button";
 import { SignOutButton } from "@/components/sign-out-button";
-import { WaterGoalForm } from "@/components/water-goal-form";
 import { auth } from "@/lib/auth";
 import { getUserProfile } from "@/lib/db/queries/account";
 

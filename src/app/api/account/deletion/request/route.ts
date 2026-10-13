@@ -19,6 +19,7 @@ import { and, eq, gte, sql } from "drizzle-orm";
 const COOLING_MS = 60 * 1000;
 const DAILY_MAX = 5;
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function POST(_req: NextRequest) {
   const { userId, error } = await requireUserId();
   if (error) return error;

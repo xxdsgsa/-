@@ -28,7 +28,7 @@ export default function LoginPage() {
 
     setSubmitting(true);
     try {
-      const { data, error } = await authClient.signIn.email({ email, password });
+      const { error } = await authClient.signIn.email({ email, password });
       if (error) {
         if (error.status === 429) {
           toast.error("尝试次数过多,账号已临时锁定,请 15 分钟后重试");

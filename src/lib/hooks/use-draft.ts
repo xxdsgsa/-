@@ -96,7 +96,10 @@ export function useAutoDraft<T>(key: string, data: T): {
   const [dirty, setDirty] = useState(false);
   // 用 ref 锁存最新 data(避免闭包陷阱)
   const dataRef = useRef<T>(data);
-  dataRef.current = data;
+  // 写 ref 必须在 effect 里,不能写在 render 阶段
+  useEffect(() => {
+    dataRef.current = data;
+  }, [data]);
 
   const saveNow = useCallback(() => {
     if (timerRef.current) {
@@ -147,19 +150,8 @@ export function useAutoDraft<T>(key: string, data: T): {
 /** 通用恢复弹窗 hook(3.3.3):mount 后弹一次,用户选"恢复"或"放弃" */
 export function useDraftRestore<T>(
   key: string,
-  onRestore: (data: T) => void,
-  onDiscard: () => void,
 ): { open: boolean; loading: boolean; dismiss: () => void } {
-  const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const draft = loadDraft<T>(key);
-    if (draft != null) {
-      setOpen(true);
-    }
-    setLoading(false);
-  }, [key]);
+  const [open, setOpen] = useState(loadDraft<T>(key) !== null);
 
   function dismiss() {
     setOpen(false);
@@ -167,8 +159,7 @@ export function useDraftRestore<T>(
 
   return {
     open,
-    loading,
+    loading: false,
     dismiss,
-    // 暴露选择行为(在父组件按钮 onClick 中调用,关闭弹窗)
   };
 }

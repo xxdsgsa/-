@@ -8,7 +8,7 @@
  * - onRestore(data):恢复时把 data 填回表单
  * - onDiscard():放弃时调 clearDraft
  */
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 
 import {
@@ -31,16 +31,9 @@ interface Props<T> {
 }
 
 export function DraftRestoreDialog<T>({ keyName, onRestore, onDiscard }: Props<T>) {
-  const [draft, setDraft] = useState<T | null>(null);
-  const [open, setOpen] = useState(false);
-
-  useEffect(() => {
-    const d = loadDraft<T>(keyName);
-    if (d != null) {
-      setDraft(d);
-      setOpen(true);
-    }
-  }, [keyName]);
+  // 草稿只读,无需 setState;直接取一次
+  const draft = loadDraft<T>(keyName);
+  const [open, setOpen] = useState(draft !== null);
 
   function doRestore() {
     if (draft != null) {

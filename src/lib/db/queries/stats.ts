@@ -49,11 +49,6 @@ function monthStart(today: string): string {
 
 type DayKind = "rest" | "completed" | "missed" | "not_done" | "no_plan" | "future";
 
-interface DayAssessment {
-  date: string;
-  kind: DayKind;
-}
-
 /**
  * 范围日状态批量判定(N 日单次查询)
  * - rest: trainingDay.isRest=true
@@ -393,7 +388,7 @@ export async function getCalendarMonth(
   month: string,
   today?: string,
 ): Promise<CalendarMonth> {
-  const t = today ?? serverToday();
+  void today; // 保留签名,未来接入 today 过滤逻辑
   const { start, end } = monthBounds(month);
   const dates = dateRange(start, end);
 

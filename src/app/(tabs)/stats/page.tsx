@@ -346,8 +346,7 @@ function CalendarMonthView({
   month: { month: string; days: { date: string; kind: string }[] };
   today: string;
 }) {
-  // 把 days 装进 map + 补齐空格
-  const map = new Map(month.days.map((d) => [d.date, d.kind] as const));
+  // 把 days 补齐空格排成 7 列网格
   const firstDate = month.days[0]?.date;
   if (!firstDate) return null;
   const [, mm, dd] = firstDate.split("-").map(Number);

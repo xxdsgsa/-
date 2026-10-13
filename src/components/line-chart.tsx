@@ -8,11 +8,6 @@
  * - Y 轴自适应 + padding,标签 4 段
  * - 末尾点高亮(最新值)
  */
-interface Point {
-  x: number; // 0~100(归一化横向)
-  y: number; // 0~100(归一化纵向)
-}
-
 interface Series {
   name: string;
   points: Array<{ date: string; value: number }>;

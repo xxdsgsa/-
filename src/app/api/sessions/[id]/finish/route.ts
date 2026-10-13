@@ -5,7 +5,6 @@
  * 结束后当天状态由四态判定已有逻辑自动流转(3.1.9)。
  */
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 
 import { requireUserId } from "@/lib/api/auth";
 import { dayError } from "@/lib/api/days";
