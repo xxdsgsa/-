@@ -101,7 +101,7 @@ git push origin main
 - [x] **3. SEO 基础** — `sitemap.ts` / `robots.ts` / `layout` metadata 已完善
 - [x] **4. 安全 headers** — `next.config.ts` 已配置 X-Frame-Options / HSTS 等
 - [x] **5. PWA 支持** — `manifest.webmanifest` / `theme-color` / 占位图标已部署
-- [ ] **6. Sentry 接入** — 需人工确认 `@sentry/nextjs` 安装后启用
+- [ ] **6. Sentry 接入** — 跳过 V1,先靠 console.error;V1.1 评估接入 (`@sentry/nextjs` 待人工确认)
 - [ ] **7. 上线文档** — README / 环境变量清单已完善
 
 ---
