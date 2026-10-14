@@ -97,7 +97,7 @@ git push origin main
 上线前逐项确认:
 
 - [x] **1. 错误兜底** — `error.tsx` / `global-error.tsx` / `not-found.tsx` 已部署 (`a7640a0`)
-- [x] **2. 全局鉴权** — `middleware.ts` Edge 鉴权 + 已登录用户守卫 (`4c69a7c`)
+- [x] **2. 全局鉴权** — `proxy.ts`(Next.js 16 middleware 重命名)Edge 鉴权 + 已登录用户守卫 (`4c69a7c`,迁移至 proxy)
 - [x] **3. SEO 基础** — `sitemap.ts` / `robots.ts` / `layout` metadata 已完善
 - [x] **4. 安全 headers** — `next.config.ts` 已配置 X-Frame-Options / HSTS 等
 - [x] **5. PWA 支持** — `manifest.webmanifest` / `theme-color` / 占位图标已部署

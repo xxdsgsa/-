@@ -1,5 +1,5 @@
 /**
- * 全局 Edge Middleware(Next.js 16)
+ * 全局 Edge Proxy(Next.js 16: middleware 已重命名为 proxy)
  *
  * 职责:
  *  1. 受保护页面统一守卫(SSR 阶段拦截未登录用户 → /login)
@@ -7,7 +7,7 @@
  *  3. Session 检查走 Better Auth cookie 校验,失败一律 401/重定向,不依赖 DB
  *
  * 边缘约束:
- *  - middleware 跑在 Edge runtime,不能 import Drizzle / 业务库
+ *  - proxy 跑在 Edge runtime,不能 import Drizzle / 业务库
  *  - Session 校验通过 Better Auth 提供的 cookie 解析(轻量,不查 DB)
  *  - 路由白名单:/login /signup /forgot-password /agreement /privacy /api/auth/*
  *  - matcher 排除静态资源 + _next
@@ -40,7 +40,7 @@ function hasSession(req: NextRequest): boolean {
   return SESSION_COOKIES.some((name) => req.cookies.get(name)?.value);
 }
 
-export function middleware(req: NextRequest) {
+export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // 公开路由:放行
