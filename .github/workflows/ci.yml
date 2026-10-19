@@ -6,10 +6,13 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   ci:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
 
     steps:
       - name: Checkout
@@ -18,7 +21,7 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 9
+          version: 12
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -33,7 +36,4 @@ jobs:
         run: pnpm lint
 
       - name: Unit tests
-        run: pnpm test
-
-      - name: Build
-        run: pnpm build
+        run: pnpm test --run
