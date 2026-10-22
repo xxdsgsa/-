@@ -1,8 +1,13 @@
 # FitMate Agent Skills
 
-项目级手动触发的 Cursor Agent Skills。**全部 `disable-model-invocation: true` —— AI 不会自动 invoke,只在被显式调用时生效。**
+项目级 Cursor Agent Skills。**两种触发模式并存:**
 
-## 三个 skill 一览
+- **自建 3 个**(下表上半部分):`disable-model-invocation: true` —— AI 不会自动 invoke,只在被显式调用时生效。
+- **社区 5 个**(下表下半部分):保留上游原生 `description`,**允许 AI 自动 invoke**。装这些 skill 是为了在对话中自动捕获意图,而不是每次都要点名。
+
+---
+
+## 自建 skill(仅手动触发)
 
 | Skill | 何时手动触发 | 触发后 AI 做什么 |
 |---|---|---|
@@ -10,7 +15,7 @@
 | `tdd-red` | "加新功能 / 写新规则 / 写新查询" (在写实现前) | 写**失败**单测,跑通确认 red,交付给 green 阶段;不在此 skill 写实现 |
 | `verify-build` | "跑一下 / 验证 / commit 前" | 顺序跑 typecheck → lint → test → build,出绿/红报告表 |
 
-## 怎么手动触发
+### 怎么手动触发
 
 在 Cursor 里**直接叫出名字**就行,任选其一:
 
@@ -28,23 +33,63 @@
 "verify-build 看看能不能合"
 ```
 
+---
+
+## 社区 skill(自动触发)
+
+装自 SkillsMP。**均已适配为 FitMate 版本**,上游专有内容(Warp 署名、云端 agent、Figma MCP、自动装依赖)已剥离。
+
+| Skill | 来源 | 何时自动触发 | 作用 |
+|---|---|---|---|
+| `half-fixed` | [heyzainali/half-fixed](https://github.com/heyzainali/half-fixed)(MIT) | 刚修完一个 query / schema,想知道有没有同类文件没跟上 | 扫 git 历史找「只修了一半的兄弟实现」,分诊后逐个补 |
+| `validate-changes-match-specs` | [warpdotdev/common-skills](https://github.com/warpdotdev/common-skills) | review 或收尾一个 spec 驱动的改动 | 实现 vs `docs/PRD.md` / `docs/TECH.md` / `AGENTS.md` 逐条比对 |
+| `merge-risk` | [warpdotdev/common-skills](https://github.com/warpdotdev/common-skills) | 问「这个能合吗」 | 五维评分:alignment / impact / verification / rollback / error-detection |
+| `next-dev-loop` | [vercel/next.js](https://github.com/vercel/next.js/tree/canary/skills/next-dev-loop) | 改完 Next.js app 代码,想确认真跑起来是对的 | /_next/mcp + agent-browser 双视角验证运行期行为 |
+| `next-bundle-optimizer` | [vercel/next.js](https://github.com/vercel/next.js/tree/canary/skills/next-bundle-optimizer) | 首屏慢 / 客户端包过大 | next analyze 构建证据驱动的负载审计与优化 |
+
+**最常自动触发的是 `half-fixed`** —— 它正好对应 AGENTS.md 第一条数据规则(user_id 条件必须全覆盖)。Agent 改完一个 `lib/db/queries/*.ts` 后,这个 skill 会问你要不要查一遍同类文件。
+
+---
+
+## ⚠️ 已知前置条件
+
+`next-dev-loop` 依赖 `agent-browser` CLI(全局 `npm i -g agent-browser@latest`,需 >= 0.31.1)。**当前 FitMate 环境未安装**,在装上之前它的 preflight 第 1 步会失败并拒绝继续。
+
+按 `AGENTS.md`「禁止安装新依赖」规则,安装需人工确认。其余 4 个 skill 零额外依赖(`half-fixed` 自带零依赖扫描器)。
+
+`half-fixed` 在 Windows 下会打印一条 `MODULE_TYPELESS_PACKAGE_JSON` 警告(Node 缺 `"type": "module"` 时重解析 ESM)。不影响功能,忽略即可 —— 不要为此改项目 `package.json`。
+
+---
+
 ## 工作流(典型一天)
 
 ```
 1. 写新功能
    ├─ "按 tdd-red 写测试"          ← 写一个失败测试
    ├─ 写实现代码(普通对话)
+   ├─ 自动:"这次改动有没有漏改同类文件?"  ← half-fixed
    └─ "verify-build 跑一遍"        ← 全套验证
+
 2. 改 bug
    ├─ "用 fix-bug 排查"            ← 5 步流程
+   ├─ 自动:half-fixed 查同类漏网
    └─ "verify-build 跑一遍"        ← 验证没回归
+
 3. 准备 commit
-   └─ "verify-build 跑一遍"        ← 全绿再 commit
+   ├─ "这个能合吗?"                ← merge-risk
+   ├─ "verify-build 跑一遍"        ← 全绿再 commit
+   └─ "实现和 spec 对得上吗?"      ← validate-changes-match-specs
+
+4. Next.js 专项
+   ├─ "改完真的跑起来对吗?"        ← next-dev-loop
+   └─ "首屏是不是太重?"            ← next-bundle-optimizer
 ```
+
+---
 
 ## 约束(从 AGENTS.md 继承)
 
-所有 skill **强制遵守**项目根的 `AGENTS.md` 22 条规则,核心:
+所有 skill **强制遵守**项目根的 `AGENTS.md` 规则,核心:
 
 - 业务逻辑只放 `lib/<domain>/<rule>.ts` 纯函数
 - 数据访问只走 `lib/db/queries/`
@@ -53,29 +98,46 @@
 - 一次一个独立功能 commit
 - 不改 `.env`、不修改已有 Drizzle migration(只新增)
 
+---
+
 ## 文件结构
 
 ```
 .cursor/skills/
-├── README.md          ← 本文件
-├── fix-bug/SKILL.md
-├── tdd-red/SKILL.md
-└── verify-build/SKILL.md
+├── README.md                        ← 本文件
+├── fix-bug/SKILL.md                 ┐
+├── tdd-red/SKILL.md                 ├ 自建,仅手动
+├── verify-build/SKILL.md            ┘
+├── half-fixed/                      ┐
+│   ├── SKILL.md                     │
+│   ├── scripts/half-fixed.js        │ 社区,自动触发
+│   └── references/{triage,fixing}.md│
+├── validate-changes-match-specs/SKILL.md      ┘
+├── merge-risk/SKILL.md
+├── next-dev-loop/SKILL.md
+└── next-bundle-optimizer/
+    ├── SKILL.md
+    └── references/{graph-methods,fix-patterns}.md
 ```
 
-每个 skill 只有一个 `SKILL.md`,刻意保持精简(< 150 行,均满足 Cursor 推荐的 < 500 行上限)。详情在文件里。
+---
 
 ## 维护规则
 
 - **新增 skill**:在 `AGENTS.md` 里加一条 ADR 解释为什么需要,再写 SKILL.md,然后一个 commit
 - **改 skill**:同样一个 commit,message 前缀 `chore(skills):`
 - **删 skill**:先看 git log 决定是不是有人还在用,然后一个 commit
+- **升级社区 skill**:重新读上游 SKILL.md,只 diff 出上游改动,**重新套用本文件的适配段落**再落盘
 
 ## 没装的 & 为什么
 
 | 候选 | 不装的原因 |
 |---|---|
 | `commit-msg` (写 commit 信息) | 你已经用 `git commit -m "..."` 手写,前置不够痛 |
-| `pr-review` | 还没建 CI,本地跑 verify-build 就够 |
-| `e2e` 跑 Playwright 的 skill | 慢且易 flakiness,等 e2e 套件稳定再加 |
+| `pr-review` | 本仓库目前单人开发,`merge-risk` 已覆盖合并前视角 |
+| `e2e` 跑 Playwright 的 skill | 慢且易 flakiness,`pnpm test:e2e` 已够用 |
 | `adr-author` (写 ADR) | docs/ 下 ADR 都是人写的判断,AI 写会丢上下文 |
+| `next-cache-components-adoption` | 属重量级框架迁移,应单独立项,不宜作为常驻 skill |
+| `diagnose-ci-failures` / `pr-status-triage` | 硬编码各自仓库的脚本(warp 的 Rust/WASM、next.js 的 `scripts/pr-status.js`),本仓库不存在,需大幅重写 |
+| Cloudflare `security-audit` | Cursor 自带 `security-review` subagent 已覆盖 |
+| 各类 CI runner / 定价 / 内容 / 3D / 加密类 skill | 与本项目无关 |
