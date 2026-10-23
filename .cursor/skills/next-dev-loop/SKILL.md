@@ -125,7 +125,13 @@ Next.js friction: only participate in agent feedback when managed Next.js feedba
 - **会话示例改为 PowerShell 语法**。本仓库开发环境是 Windows + PowerShell，SSE 解析一行已给出 `Invoke-WebRequest` 写法；若在 bash 环境下用同样的 skill，用回上游的 `sed` 版本。
 - **不改验证流程**。四类失败模式（编译 / 运行无错 / 行为符合预期 / React 层行为）保持原样。
 
-**注意**：`agent-browser` 需全局安装（`npm i -g agent-browser@latest`），当前 FitMate 环境**尚未安装**。在装上之前，preflight 第 1 步会失败。按 `AGENTS.md`「禁止安装新依赖」规则，安装前需人工确认。
+**注意**：已完成前置安装（2026-10-23）：
+
+- `agent-browser@0.39.2` 全局安装（`npm i -g agent-browser@latest`），满足 `>= 0.31.1` 下限。
+- 浏览器二进制已装：`agent-browser install` → Chrome 156.0.8078.47，位于 `C:\Users\xxz\.agent-browser\browsers\chrome-156.0.8078.47`。
+- 本项目 Next.js 为 `16.3.8`，满足 `16.3+` 且默认 Turbopack，preflight 第 2/3 步可通过。
+
+⚠️ **Node 版本警告**：安装时报 `EBADENGINE` —— `agent-browser@0.39.2` 要求 `node >= 24.0.0`，而本机 nvm4w 当前为 `20.20.2`。实测 CLI、session、Chrome 渲染均正常，暂不影响使用。但若后续遇到 agent-browser 侧的怪异报错，优先用 `nvm install 24 && nvm use 24` 排查（Next.js 16.3.8 本身支持 Node 20，所以 `pnpm dev / build / test` 不受影响）。
 
 ## Related skills
 

@@ -51,11 +51,19 @@
 
 ---
 
-## ⚠️ 已知前置条件
+## ✅ 已满足的前置条件
 
-`next-dev-loop` 依赖 `agent-browser` CLI(全局 `npm i -g agent-browser@latest`,需 >= 0.31.1)。**当前 FitMate 环境未安装**,在装上之前它的 preflight 第 1 步会失败并拒绝继续。
+`next-dev-loop` 的两条前置条件现在都已就位:
 
-按 `AGENTS.md`「禁止安装新依赖」规则,安装需人工确认。其余 4 个 skill 零额外依赖(`half-fixed` 自带零依赖扫描器)。
+| 依赖 | 要求 | 本机实际 | 状态 |
+|---|---|---|---|
+| Next.js | `>= 16.3` + Turbopack | `16.3.8`(默认 Turbopack) | ✅ |
+| `agent-browser` | `>= 0.31.1` | `0.39.2` 全局 | ✅ |
+| Chrome 二进制 | 随 agent-browser 安装 | `156.0.8078.47`(`~/.agent-browser/browsers/`) | ✅ |
+
+装法:`npm i -g agent-browser@latest` + `agent-browser install`(2026-10-23 执行)。其余 4 个 skill 零额外依赖(`half-fixed` 自带零依赖扫描器)。
+
+⚠️ **唯一遗留告警**:安装时报 `EBADENGINE`,`agent-browser@0.39.2` 要求 `node >= 24.0.0`,本机 nvm4w 当前 `20.20.2`。实测功能正常,可用;若日后 agent-browser 侧出现异常,先用 `nvm install 24 && nvm use 24` 试。Next.js 16.3.8 本身支持 Node 20,不影响 `pnpm dev / build / test`。
 
 `half-fixed` 在 Windows 下会打印一条 `MODULE_TYPELESS_PACKAGE_JSON` 警告(Node 缺 `"type": "module"` 时重解析 ESM)。不影响功能,忽略即可 —— 不要为此改项目 `package.json`。
 
