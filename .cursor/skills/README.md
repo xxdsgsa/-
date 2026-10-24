@@ -2,7 +2,7 @@
 
 项目级 Cursor Agent Skills。**两种触发模式并存:**
 
-- **自建 3 个**(下表上半部分):`disable-model-invocation: true` —— AI 不会自动 invoke,只在被显式调用时生效。
+- **自建 4 个**(下表上半部分):`disable-model-invocation: true` —— AI 不会自动 invoke,只在被显式调用时生效。
 - **社区 5 个**(下表下半部分):保留上游原生 `description`,**允许 AI 自动 invoke**。装这些 skill 是为了在对话中自动捕获意图,而不是每次都要点名。
 
 ---
@@ -86,6 +86,7 @@
    └─ "verify-build 跑一遍"        ← 验证没回归
 
 3. 准备 commit
+   ├─ "用 parallel-review 审一下"  ← 4 个只读 subagent 并行 + 置信度 ≥80
    ├─ "这个能合吗?"                ← merge-risk
    ├─ "verify-build 跑一遍"        ← 全绿再 commit
    └─ "实现和 spec 对得上吗?"      ← validate-changes-match-specs
