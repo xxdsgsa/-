@@ -3,6 +3,23 @@ allowBuilds:
   sharp: false
   unrs-resolver: false
 
+# 供应链策略绕过:pnpm 12 拒绝安装发布不足 24h 的包。
+# next@16.4.3 发布于 2026-10-23,待冷静期过后(2026-10-24 之后)
+# 可删除本段,届时 pnpm install --frozen-lockfile 将不再需要它。
+minimumReleaseAgeExclude:
+  - '@next/env@16.4.3'
+  - '@next/swc-darwin-arm64@16.4.3'
+  - '@next/swc-darwin-x64@16.4.3'
+  - '@next/swc-linux-arm64-gnu@16.4.3'
+  - '@next/swc-linux-arm64-musl@16.4.3'
+  - '@next/swc-linux-x64-gnu@16.4.3'
+  - '@next/swc-linux-x64-musl@16.4.3'
+  - '@next/swc-win32-arm64-msvc@16.4.3'
+  - '@next/swc-win32-x64-msvc@16.4.3'
+  - next@16.4.3
+  - '@next/eslint-plugin-next@16.4.3'
+  - eslint-config-next@16.4.3
+
 overrides:
   brace-expansion@<2.0.0: 1.1.21
   brace-expansion@>=4.0.0: 5.0.12
