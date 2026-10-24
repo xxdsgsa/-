@@ -37,6 +37,23 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 | `merge-risk` | warpdotdev/common-skills | 自动 | PR 五维合并风险评分 |
 | `next-dev-loop` | vercel/next.js | 自动 | 改完代码在运行中的 app 里验证行为 |
 | `next-bundle-optimizer` | vercel/next.js | 自动 | 首屏客户端负载审计与优化 |
+| `parallel-review` | 自建 | 仅手动 | 4 个只读 subagent 并行审查 + 置信度 ≥80 过滤 |
+
+## Agent Subagents
+
+只读审查 subagent 位于 `.claude/agents/`(Cursor 与 Claude Code 通用),均设 `readonly: true`——只读分析,不改文件。
+
+| Subagent | 关注维度 | 明确不碰 |
+|---|---|---|
+| `compliance-reviewer` | 分层红线 / `user_id` 越权 / localStorage 白名单 / 禁 `any` / 迁移不可改 | 类型细节、测试充分性 |
+| `type-boundary-reviewer` | Zod 与 TS 类型一致性 / `any` 泄漏 / 可空性 / 校验边界 | 业务逻辑、分层 |
+| `error-handling-reviewer` | 静默失败 / fallback 掩盖 / 错误码一致性 | 类型、分层、测试 |
+| `test-coverage-reviewer` | 覆盖缺口 / 边界负例 / 测试质量 | 实现正确性、类型 |
+
+- ADR-24:引入只读审查 subagent(`.claude/agents/`),因为 `AGENTS.md` 的硬规则(user_id 越权、分层越界、敏感数据落 localStorage、禁 `any`)目前只能靠人工或单一 reviewer 发现,而这些规则一旦违反就是安全事故或数据越权。选 `.claude/agents/` 而非 `.cursor/agents/`,因为 Cursor 官方支持该目录且与 Claude Code 共用同一份定义;四个 agent 按维度正交切分,避免重复劳动。
+- ADR-25:四个 subagent 全部设 `readonly: true`,因为 Cursor 并行 Task 的多个 subagent 无文件锁,并行写同一文件会 race condition。结构性限制写权限比靠提示词约束更可靠:并行只做只读分析,写操作一律由主 agent 串行执行。
+- ADR-26:审查结论按置信度 ≥80 过滤(借鉴 Claude Code `code-review` 插件的评分机制),因为多 agent 并行产出的低置信度发现会淹没真实问题,导致主 agent 宁可全不改。阈值可按用户要求调整(多报 75 / 确凿 90)。
+- ADR-27:`error-handling-reviewer` 明确把 `src/lib/api/auth.ts` / `src/lib/api/parse.ts` / `src/lib/hooks/use-draft.ts` 中的 `.catch(() => null)` 判定为刻意设计(把预期失败翻译成 401/400 而非 500),因为上游同类 agent 会将其一律判为静默失败,在本项目会大规模误报。ADR-16 规定 Sentry 上线前才接入,故「缺少 error ID / Sentry 上报」当前不作为缺陷。
 
 - ADR-18:采用 `half-fixed`,因为「所有用户数据查询必须带 user_id」这类规则天然要求同类 query 同步修改,人工容易漏。扫描 git 历史找出只改了一半的兄弟文件,正好覆盖这个风险。
 - ADR-19:采用 `validate-changes-match-specs`,因为本仓库已有 PRD + TECH + 17 条 ADR 的规格体系,但缺少「实现是否兑现规格」的机械化检查。已适配为读取 `docs/` 布局,并把 AGENTS.md 硬规则纳入 mismatch 判定。

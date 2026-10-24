@@ -14,6 +14,7 @@
 | `fix-bug` | "报 bug / 报错 / 测试挂了 / 排查错误" | 走 5 步:复现 → 定位 → 根因 → 修复 → 验证,最后输出 Bug fix report |
 | `tdd-red` | "加新功能 / 写新规则 / 写新查询" (在写实现前) | 写**失败**单测,跑通确认 red,交付给 green 阶段;不在此 skill 写实现 |
 | `verify-build` | "跑一下 / 验证 / commit 前" | 顺序跑 typecheck → lint → test → build,出绿/红报告表 |
+| `parallel-review` | "审查这个改动 / 帮我全面检查 / 这个能合吗" | 4 个只读 subagent 并行审查,置信度 ≥80 过滤后汇总 |
 
 ### 怎么手动触发
 
@@ -23,6 +24,7 @@
 "用 fix-bug 排查一下:登录页点了没反应"
 "用 tdd-red 写一个 isFutureDate 的测试"
 "用 verify-build 跑一遍"
+"用 parallel-review 审一下这个改动"
 ```
 
 或更自然:
@@ -115,7 +117,8 @@
 ├── README.md                        ← 本文件
 ├── fix-bug/SKILL.md                 ┐
 ├── tdd-red/SKILL.md                 ├ 自建,仅手动
-├── verify-build/SKILL.md            ┘
+├── verify-build/SKILL.md            │
+├── parallel-review/SKILL.md         ┘ 自建,仅手动
 ├── half-fixed/                      ┐
 │   ├── SKILL.md                     │
 │   ├── scripts/half-fixed.js        │ 社区,自动触发
@@ -126,7 +129,15 @@
 └── next-bundle-optimizer/
     ├── SKILL.md
     └── references/{graph-methods,fix-patterns}.md
+
+.claude/agents/                      ← 只读审查 subagent(Cursor + Claude Code 通用)
+├── compliance-reviewer.md           ← 分层红线 / user_id / localStorage / 迁移
+├── type-boundary-reviewer.md        ← Zod 一致性 / any / 可空性 / 校验边界
+├── error-handling-reviewer.md       ← 静默失败 / fallback / 错误码
+└── test-coverage-reviewer.md        ← 覆盖缺口 / 测试质量
 ```
+
+**为什么 subagent 放 `.claude/agents/`**:Cursor 官方支持该目录(与 `.cursor/agents/`、`.codex/agents/` 并列),且 Claude Code 能直接复用同一份定义。四个 agent 全部设 `readonly: true`——Cursor 并行 Task 的多个 subagent 无文件锁,并行写会 race condition,所以并行阶段只读,写操作由主 agent 串行做。
 
 ---
 
@@ -149,3 +160,24 @@
 | `diagnose-ci-failures` / `pr-status-triage` | 硬编码各自仓库的脚本(warp 的 Rust/WASM、next.js 的 `scripts/pr-status.js`),本仓库不存在,需大幅重写 |
 | Cloudflare `security-audit` | Cursor 自带 `security-review` subagent 已覆盖 |
 | 各类 CI runner / 定价 / 内容 / 3D / 加密类 skill | 与本项目无关 |
+
+## Claude Code 插件库评估(2026-10)
+
+参考 [anthropics/claude-code/plugins](https://github.com/anthropics/claude-code/tree/main/plugins) 的官方插件,逐个评估后的结论:
+
+| 插件 | 结论 | 理由 |
+|---|---|---|
+| `pr-review-toolkit` | **已吸收** | 其 6 个 agent 的**审查维度**已重写进 `.claude/agents/` 的 4 个只读 agent(按 FitMate 红线重新切分维度,非逐个照搬) |
+| `code-review` | **已吸收** | 核心是「置信度评分 + 80 阈值过滤」,已落进 `parallel-review` skill 的 Phase 2 |
+| `security-guidance` | **部分吸收** | 9 种危险模式清单与 Cursor 自带 `security-review` subagent 重叠,不再重复装 |
+| `commit-commands` | 不装 | AGENTS.md 已规定「每完成一个独立功能即 git commit」,增益低 |
+| `feature-dev` | 不装 | 与已有 `tdd-red` + `fix-bug` 重叠 |
+| `frontend-design` | 不装 | 项目已有 shadcn + Tailwind 统一视觉,换风格会破坏一致性 |
+| `ralph-wiggum` | 不装 | 无人值守自改代码,与「高质量输出」目标相悖 |
+| `hookify` / `plugin-dev` / `agent-sdk-dev` / `claude-opus-4-5-migration` / 各种 output-style | 不装 | 元开发工具、不相关、或 Cursor 已自带 |
+
+**移植时做的关键适配**(详见 AGENTS.md ADR-24 ~ ADR-27):
+
+- 上游 `silent-failure-hunter` 假设项目有 `logError` / `errorIds.ts` / Statsig,并把「无日志的 catch」一律判为缺陷。FitMate 的 `.catch(() => null)` 是**刻意设计**(把预期失败翻译成 401/400 而非 500),直接套用会大规模误报——故 `error-handling-reviewer` 重写了判定基准。
+- 上游 `code-review` 依赖 `gh` CLI 与 PR 流程,本项目单人开发直推 `main`,故只吸收方法论,不移植命令。
+- Cursor 的 subagent frontmatter 比 Claude Code 多一个 `readonly` 字段,四个 agent 全部启用。
